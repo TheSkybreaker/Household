@@ -15,6 +15,7 @@
     "@astrojs/alpinejs": "1.0.0",
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
     "@fontsource/atkinson-hyperlegible": "5.3.0",
+    "@household/shared": "workspace:*",
     "alpinejs": "3.17.4",
     "astro": "7.3.5",
     "pocketbase": "0.28.1"

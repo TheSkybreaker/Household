@@ -1,26 +1,12 @@
 // List dates are local calendar days stored as "YYYY-MM-DD" text, never Date objects in UTC.
+import { addDays, capitalize, fromIsoDate, toIsoDate } from '@household/shared/dates';
+
+export { addDays, capitalize, fromIsoDate, toIsoDate };
 
 const longFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
 const weekdayShortFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'short' });
 const weekdayLongFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'long' });
 const monthFormat = new Intl.DateTimeFormat('it-IT', { month: 'long' });
-
-const pad = (value: number) => String(value).padStart(2, '0');
-
-export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-
-export function toIsoDate(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-export function fromIsoDate(isoDate: string): Date {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-export function addDays(date: Date, days: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-}
 
 export function relativeDay(isoDate: string, now = new Date()): 'Oggi' | 'Domani' | 'Ieri' | null {
   if (isoDate === toIsoDate(now)) return 'Oggi';
