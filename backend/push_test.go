@@ -67,14 +67,14 @@ func testConfig(dev bool) config {
 	}
 }
 
-func addSubscription(t testing.TB, app core.App, user *core.Record, endpoint string) *core.Record {
+func addSubscription(t testing.TB, app core.App, user *core.Record, endpoint string, appID string) *core.Record {
 	t.Helper()
 	collection, err := app.FindCollectionByNameOrId("push_subscriptions")
 	if err != nil {
 		t.Fatal(err)
 	}
 	subscription := core.NewRecord(collection)
-	subscription.Load(map[string]any{"user": user.Id, "endpoint": endpoint, "p256dh": "key", "auth": "secret"})
+	subscription.Load(map[string]any{"user": user.Id, "endpoint": endpoint, "p256dh": "key", "auth": "secret", "app": appID})
 	if err := app.Save(subscription); err != nil {
 		t.Fatal(err)
 	}
@@ -89,9 +89,9 @@ func TestNotifyItemAddedSkipsAuthorAndDropsGoneSubscriptions(t *testing.T) {
 	}
 	t.Cleanup(app.Cleanup)
 
-	ownDevice := addSubscription(t, app, f.userA, "https://push.example.com/a")
-	partnerPhone := addSubscription(t, app, f.userB, "https://push.example.com/b-phone")
-	partnerGone := addSubscription(t, app, f.userB, "https://push.example.com/b-gone")
+	ownDevice := addSubscription(t, app, f.userA, "https://push.example.com/a", appShopping)
+	partnerPhone := addSubscription(t, app, f.userB, "https://push.example.com/b-phone", appShopping)
+	partnerGone := addSubscription(t, app, f.userB, "https://push.example.com/b-gone", appShopping)
 
 	service := &fakePushService{status: map[string]int{"https://push.example.com/b-gone": http.StatusGone}}
 	cfg := testConfig(false)
@@ -144,7 +144,7 @@ func TestCreatingAnItemPushesToThePartner(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			addSubscription(t, app, f.userB, "https://push.example.com/b")
+			addSubscription(t, app, f.userB, "https://push.example.com/b", appShopping)
 			registerPush(app, testConfig(false), service.send)
 			return app
 		},
@@ -166,7 +166,7 @@ func TestCreatingAnItemPushesToThePartner(t *testing.T) {
 func TestPushRoutes(t *testing.T) {
 	f := newFixture(t)
 	endpoint := "https://fcm.googleapis.com/fcm/send/shared-browser"
-	subscribeBody := `{"endpoint":"` + endpoint + `","keys":{"p256dh":"key","auth":"secret"}}`
+	subscribeBody := `{"endpoint":"` + endpoint + `","keys":{"p256dh":"key","auth":"secret"},"app":"shopping"}`
 
 	pushApp := func(dev bool, setup func(testing.TB, *tests.TestApp)) func(testing.TB) *tests.TestApp {
 		return func(t testing.TB) *tests.TestApp {
@@ -188,7 +188,7 @@ func TestPushRoutes(t *testing.T) {
 		}
 		return subscription.GetString("user")
 	}
-	subscribedByB := func(t testing.TB, app *tests.TestApp) { addSubscription(t, app, f.userB, endpoint) }
+	subscribedByB := func(t testing.TB, app *tests.TestApp) { addSubscription(t, app, f.userB, endpoint, appShopping) }
 
 	scenarios := []tests.ApiScenario{
 		{Name: "guest reads the key", Method: http.MethodGet, URL: "/api/push/key", TestAppFactory: pushApp(false, nil), ExpectedStatus: 401, ExpectedContent: []string{`"data":{}`}},
@@ -209,6 +209,22 @@ func TestPushRoutes(t *testing.T) {
 				count, err := app.CountRecords("push_subscriptions")
 				if err != nil || count != 1 || subscriptionOwner(t, app) != f.userA.Id {
 					t.Fatalf("count = %d, owner = %q, want 1 subscription of user A", count, subscriptionOwner(t, app))
+				}
+			},
+		},
+		{
+			Name: "a subscription without app is refused", Method: http.MethodPost, URL: "/api/push/subscribe", Headers: f.authA(),
+			Body: strings.NewReader(`{"endpoint":"` + endpoint + `","keys":{"p256dh":"key","auth":"secret"}}`), TestAppFactory: pushApp(false, nil),
+			ExpectedStatus: 400, ExpectedContent: []string{`"data":{}`},
+		},
+		{
+			Name: "a subscription of Conti is stored as such", Method: http.MethodPost, URL: "/api/push/subscribe", Headers: f.authA(),
+			Body: strings.NewReader(`{"endpoint":"` + endpoint + `","keys":{"p256dh":"key","auth":"secret"},"app":"cash"}`), TestAppFactory: pushApp(false, nil),
+			ExpectedStatus: 204,
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				subscription, err := app.FindFirstRecordByData("push_subscriptions", "endpoint", endpoint)
+				if err != nil || subscription.GetString("app") != appCash {
+					t.Fatalf("subscription app = %q, want cash (%v)", subscription.GetString("app"), err)
 				}
 			},
 		},
@@ -245,6 +261,31 @@ func TestPushRoutes(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		scenario.Test(t)
+	}
+}
+
+func TestItemPushReachesOnlyTheSpesa(t *testing.T) {
+	f := newFixture(t)
+	app, err := tests.NewTestApp(f.dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	addSubscription(t, app, f.userB, "https://push.example.com/b-shopping", appShopping)
+	addSubscription(t, app, f.userB, "https://push.example.com/b-cash", appCash)
+	service := &fakePushService{}
+	p := &pusher{app: app, cfg: testConfig(false), send: service.send, client: http.DefaultClient}
+
+	item, err := app.FindRecordById("items", f.item.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.notifyItemAdded(item); err != nil {
+		t.Fatal(err)
+	}
+	if got := service.endpoints(); !slices.Equal(got, []string{"https://push.example.com/b-shopping"}) {
+		t.Fatalf("pushed to %v, want only the Spesa of the partner", got)
 	}
 }
 

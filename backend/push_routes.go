@@ -37,6 +37,8 @@ type subscriptionBody struct {
 		P256dh string `json:"p256dh"`
 		Auth   string `json:"auth"`
 	} `json:"keys"`
+	// App is the one whose service worker made the subscription.
+	App string `json:"app"`
 }
 
 func registerPushRoutes(se *core.ServeEvent, p *pusher) {
@@ -60,7 +62,7 @@ func (p *pusher) subscribe(e *core.RequestEvent) error {
 	if err := e.BindBody(&body); err != nil {
 		return e.BadRequestError("Invalid subscription.", err)
 	}
-	if !isPushServiceEndpoint(body.Endpoint) || body.Keys.P256dh == "" || body.Keys.Auth == "" {
+	if !isPushServiceEndpoint(body.Endpoint) || body.Keys.P256dh == "" || body.Keys.Auth == "" || (body.App != appShopping && body.App != appCash) {
 		return e.BadRequestError("Invalid subscription.", nil)
 	}
 
@@ -74,6 +76,7 @@ func (p *pusher) subscribe(e *core.RequestEvent) error {
 		subscription.Set("endpoint", body.Endpoint)
 	}
 	subscription.Set("user", e.Auth.Id)
+	subscription.Set("app", body.App)
 	subscription.Set("p256dh", body.Keys.P256dh)
 	subscription.Set("auth", body.Keys.Auth)
 	subscription.Set("user_agent", e.Request.UserAgent())
@@ -102,12 +105,12 @@ func (p *pusher) unsubscribe(e *core.RequestEvent) error {
 
 // sendTest pushes a sample notification to the devices of the signed-in user. Only with DEV=1.
 func (p *pusher) sendTest(e *core.RequestEvent) error {
-	subscriptions, err := p.app.FindAllRecords("push_subscriptions", dbx.HashExp{"user": e.Auth.Id})
+	subscriptions, err := p.app.FindAllRecords("push_subscriptions", dbx.HashExp{"user": e.Auth.Id, "app": appShopping})
 	if err != nil {
 		return err
 	}
 
-	// "test" is shown even with the app on screen, where the button is.
+	// The test payload is the Spesa's; "test" is shown even with the app on screen, where the button is.
 	payload, err := json.Marshal(pushPayload{
 		Type:      "test",
 		ListID:    "test",
