@@ -18,7 +18,7 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/spf13/cobra"
 
-	_ "spesa/migrations"
+	_ "household/migrations"
 )
 
 type config struct {

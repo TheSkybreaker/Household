@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 
 // PocketBase serves the build from its pb_public directory.
-const outDir = fileURLToPath(new URL('../backend/pb_public', import.meta.url));
+const outDir = fileURLToPath(new URL('../../backend/pb_public', import.meta.url));
 
 export default defineConfig({
   output: 'static',

@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  apps/shopping:
     dependencies:
       '@alpinejs/collapse':
         specifier: 3.17.4

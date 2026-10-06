@@ -1,9 +1,11 @@
 .playwright-mcp/
+.superpowers/
 .DS_Store
 .env
 
+node_modules/
+.astro/
+dist/
+
 backend/pb_data/
 backend/pb_public/
-
-web/node_modules/
-web/.astro/

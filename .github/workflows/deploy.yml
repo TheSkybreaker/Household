@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 26
           cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - uses: actions/setup-go@v7
         with:
@@ -31,11 +31,10 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Test and build the frontend
-        working-directory: web
         run: |
           pnpm install --frozen-lockfile
-          pnpm test
-          pnpm build
+          pnpm --filter shopping test
+          pnpm --filter shopping build
 
       # The commit becomes the version: `spesa --version` on the server tells what is live.
       - name: Test and build the binary

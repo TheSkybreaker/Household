@@ -17,7 +17,7 @@ Obiettivi della v1:
 
 Non obiettivi della v1: registrazione pubblica, più nuclei familiari, iOS, modifiche offline con coda di sincronizzazione, categorie o reparti.
 
-Riferimento visivo: la demo HTML si trova in `docs/demo.html`, scaricata dalla [demo pubblicata](https://claude.ai/artifact/BWm5yGRPudtpV1iUU8spvf). Per aspetto e comportamenti dell'interfaccia vale come fonte di verità.
+Riferimento visivo: la demo HTML si trova in `docs/demo-shopping.html`, scaricata dalla [demo pubblicata](https://claude.ai/artifact/BWm5yGRPudtpV1iUU8spvf). Per aspetto e comportamenti dell'interfaccia vale come fonte di verità.
 
 ## Come lavorare
 
@@ -28,7 +28,7 @@ Procedi per milestone, nell'ordine della sezione Milestone e criteri di accettaz
 - Niente Tailwind né librerie di componenti: CSS semplice con le custom properties della sezione Design system.
 - Testi dell'interfaccia in italiano, come nella sezione Testi dell'interfaccia. Codice, nomi di file, commenti e commit in inglese.
 - Se un dettaglio non è coperto qui, segui la demo. Se non lo copre neanche la demo, chiedi invece di inventare.
-- Alla fine di ogni milestone spunta le sue caselle in `docs/DESIGN.md` e aggiungi due righe a `CHANGELOG.md`.
+- Alla fine di ogni milestone spunta le sue caselle in `docs/DESIGN-shopping.md` e aggiungi due righe a `CHANGELOG.md`.
 
 ## Stack e architettura
 
@@ -73,8 +73,8 @@ spesa/
     migrations/        schema delle collezioni
     pb_public/         output della build Astro (non versionato)
     pb_data/           database e file (non versionato)
-  web/
-    astro.config.mjs   outDir: ../backend/pb_public
+  apps/shopping/
+    astro.config.mjs   outDir: ../../backend/pb_public
     src/
       pages/           index.astro, login.astro, lista.astro
       components/      componenti .astro con direttive Alpine
@@ -83,7 +83,7 @@ spesa/
       sw.ts            service worker
     public/icons/      icone app e badge notifiche
   .github/workflows/   deploy.yml: test, build e deploy a ogni push su main
-  docs/                DESIGN.md (questo documento), demo.html
+  docs/                DESIGN-shopping.md (questo documento), demo-shopping.html
 ```
 
 Il dettaglio di una lista è `/lista?id=<id>`, non `/lista/<id>`: in output statico Astro non può generare pagine per id che non conosce. Verifica che PocketBase serva `lista/index.html` per `/lista`.
@@ -347,7 +347,7 @@ Il comando `vapid` stampa una coppia di chiavi con `webpush.GenerateVAPIDKeys()`
 ### Sviluppo
 
 1. `go run . serve` avvia PocketBase su `:8090`; la dashboard è su `/_/` e lì si creano i due utenti.
-2. `pnpm dev` in `web/` avvia Astro su `:4321`, con un proxy Vite da `/api` verso `:8090`: il client usa sempre lo stesso origin.
+2. `pnpm dev` in `apps/shopping/` avvia Astro su `:4321`, con un proxy Vite da `/api` verso `:8090`: il client usa sempre lo stesso origin.
 3. `@vite-pwa/astro` con `devOptions` attivi, per avere il service worker anche in sviluppo.
 4. Telefono via USB: `chrome://inspect` sul PC con port forwarding della porta 4321. Sul telefono `localhost` è un contesto sicuro, quindi service worker e push funzionano senza HTTPS.
 
@@ -355,7 +355,7 @@ Il comando `vapid` stampa una coppia di chiavi con `webpush.GenerateVAPIDKeys()`
 
 Il repository contiene solo il workflow; la configurazione del server vive sul server, nei percorsi qui sotto.
 
-1. Build: `pnpm build` in `web/` scrive in `backend/pb_public`, poi `go build -tags embed` produce un unico binario con il frontend incorporato. Senza il tag il binario legge `pb_public` dal disco, come in sviluppo.
+1. Build: `pnpm build` in `apps/shopping/` scrive in `backend/pb_public`, poi `go build -tags embed` produce un unico binario con il frontend incorporato. Senza il tag il binario legge `pb_public` dal disco, come in sviluppo.
 2. Deploy: a ogni push su `main` il workflow `Deploy` esegue test e build, poi manda il binario Linux via SSH con una chiave che può lanciare solo `~/bin/deploy-spesa.sh`. Lo script controlla lo SHA-256, salva il database in `predeploy.db`, sostituisce il binario, riavvia il servizio e rimette il binario precedente se `/api/health` non risponde. Il commit diventa la versione del binario: `/var/www/spesa/spesa --version` dice cosa è in produzione. Segreti del repository: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USER`, `DEPLOY_KNOWN_HOSTS`.
 3. Servizio: binario, `.env` e `pb_data` in `/var/www/spesa`, servizio systemd utente `~/.config/systemd/user/spesa.service` in ascolto su `127.0.0.1:8090`, con scrittura permessa solo in `pb_data`, home non leggibile e niente socket Unix, quindi niente accesso a docker. Le migrazioni partono da sole all'avvio.
 4. Caddy: blocco `shopping.skybreaker.dev` in `/etc/caddy/Caddyfile` con `reverse_proxy` e compressione esclusa per `/api/*`, così le connessioni SSE del realtime arrivano subito. PocketBase si fida di `X-Forwarded-For` e limita i tentativi di login (migrazione `proxy_and_rate_limits`).
@@ -379,7 +379,7 @@ Cinque milestone in sequenza; ognuna è finita quando tutte le sue caselle sono 
 - [x] Home con i due gruppi, pannello Nuova lista, dettaglio con aggiunta, spunta, eliminazione e annulla
 - [x] Parser della quantità con test unitari su tutti i casi della tabella
 - [x] Realtime: due browser con utenti diversi si vedono a vicenda entro 1 secondo
-- [ ] Confronto visivo con `docs/demo.html` su un telefono, in tema scuro
+- [ ] Confronto visivo con `docs/demo-shopping.html` su un telefono, in tema scuro
 
 ### 3. PWA
 

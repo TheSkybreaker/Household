@@ -1,4 +1,4 @@
-module spesa
+module household
 
 go 1.27.1
 
