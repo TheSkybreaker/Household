@@ -30,6 +30,9 @@ func registerCookieAuth(app core.App, cfg config) {
 		})
 
 		se.Router.POST("/api/auth/logout", func(e *core.RequestEvent) error {
+			if !isSameOrigin(e.Request) {
+				return e.ForbiddenError("Sign out from the apps.", nil)
+			}
 			e.SetCookie(authCookie(cfg, "", -1))
 			return e.NoContent(http.StatusNoContent)
 		})
@@ -38,19 +41,24 @@ func registerCookieAuth(app core.App, cfg config) {
 
 	// Sign-in and refresh write the new token into the cookie and leave it out of the response.
 	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
+		// Posted by another site, a sign-in would put that site's account into the cookie of the apps.
+		if !isSameOrigin(e.Request) {
+			return e.ForbiddenError("Sign in from the apps.", nil)
+		}
 		e.SetCookie(authCookie(cfg, e.Token, int(e.Collection.AuthToken.Duration)))
 		e.Token = ""
 		return e.Next()
 	})
 }
 
-// authCookie lasts as long as the token in it; a negative maxAge deletes the cookie.
+// authCookie lasts as long as the token in it; a negative maxAge deletes the cookie. Its path keeps
+// it to the API: the other sites on the same domain never receive it on their pages.
 func authCookie(cfg config, token string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     authCookieName,
 		Value:    token,
 		Domain:   cfg.cookieDomain,
-		Path:     "/",
+		Path:     "/api/",
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
@@ -60,14 +68,11 @@ func authCookie(cfg config, token string, maxAge int) *http.Cookie {
 
 // isSameOrigin tells a request of the app on this host from one another site makes the browser
 // send: every subdomain of skybreaker.dev is the same site, so SameSite=Lax alone lets those through.
+// Browsers send Sec-Fetch-Site; Origin is the fallback for those that do not.
 func isSameOrigin(r *http.Request) bool {
 	if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
 		return site == "same-origin"
 	}
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return r.Method == http.MethodGet || r.Method == http.MethodHead
-	}
-	parsed, err := url.Parse(origin)
-	return err == nil && parsed.Host == r.Host
+	origin, err := url.Parse(r.Header.Get("Origin"))
+	return err == nil && origin.Host != "" && origin.Host == r.Host
 }

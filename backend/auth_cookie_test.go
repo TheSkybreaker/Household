@@ -44,7 +44,7 @@ func TestCookieAuth(t *testing.T) {
 			if cookie == nil {
 				t.Fatal("no auth cookie in the response")
 			}
-			if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/" || cookie.MaxAge != 90*24*60*60 {
+			if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/api/" || cookie.MaxAge != 90*24*60*60 {
 				t.Fatalf("cookie attributes %+v", cookie)
 			}
 			record, err := app.FindAuthRecordByToken(cookie.Value, core.TokenTypeAuth)
@@ -59,6 +59,7 @@ func TestCookieAuth(t *testing.T) {
 			Name:            "signing in sets the cookie and leaves the token out of the response",
 			Method:          http.MethodPost,
 			URL:             "/api/collections/users/auth-with-password",
+			Headers:         map[string]string{"Sec-Fetch-Site": "same-origin"},
 			Body:            credentials("usera"),
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`"token":""`, `"username":"usera"`},
@@ -81,12 +82,26 @@ func TestCookieAuth(t *testing.T) {
 			ExpectedContent: []string{`"totalItems":0`},
 		},
 		{
-			Name:            "without Sec-Fetch-Site a GET without Origin uses the cookie",
+			Name:            "a request with neither Sec-Fetch-Site nor Origin does not use the cookie",
 			Method:          http.MethodGet,
 			URL:             "/api/collections/lists/records",
 			Headers:         map[string]string{"Cookie": cookieA},
 			ExpectedStatus:  200,
-			ExpectedContent: []string{`"totalItems":1`},
+			ExpectedContent: []string{`"totalItems":0`},
+		},
+		{
+			Name:            "a sign-in posted by another site is refused, so it cannot swap the account in the cookie",
+			Method:          http.MethodPost,
+			URL:             "/api/collections/users/auth-with-password",
+			Headers:         map[string]string{"Sec-Fetch-Site": "cross-site"},
+			Body:            credentials("usera"),
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				if authCookieFrom(res) != nil {
+					t.Fatal("a cross-site sign-in set the auth cookie")
+				}
+			},
 		},
 		{
 			Name:            "without Sec-Fetch-Site the Origin must be this host",
@@ -118,7 +133,7 @@ func TestCookieAuth(t *testing.T) {
 			Name:            "the token of an old localStorage session is exchanged for the cookie",
 			Method:          http.MethodPost,
 			URL:             "/api/collections/users/auth-refresh",
-			Headers:         map[string]string{"Authorization": f.tokenA},
+			Headers:         map[string]string{"Authorization": f.tokenA, "Sec-Fetch-Site": "same-origin"},
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`"token":""`},
 			AfterTestFunc:   expectSession("usera"),
@@ -127,10 +142,24 @@ func TestCookieAuth(t *testing.T) {
 			Name:           "signing out deletes the cookie",
 			Method:         http.MethodPost,
 			URL:            "/api/auth/logout",
+			Headers:        map[string]string{"Sec-Fetch-Site": "same-origin"},
 			ExpectedStatus: 204,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 				if cookie := authCookieFrom(res); cookie == nil || cookie.MaxAge >= 0 || cookie.Value != "" {
 					t.Fatalf("the cookie was not deleted: %+v", cookie)
+				}
+			},
+		},
+		{
+			Name:            "signing out from another site is refused",
+			Method:          http.MethodPost,
+			URL:             "/api/auth/logout",
+			Headers:         map[string]string{"Sec-Fetch-Site": "same-site"},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				if authCookieFrom(res) != nil {
+					t.Fatal("a cross-site sign-out touched the auth cookie")
 				}
 			},
 		},
