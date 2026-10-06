@@ -87,11 +87,19 @@ func newFixture(t *testing.T) *fixture {
 // run executes each scenario on its own copy of the fixture data dir, which keeps the
 // collection token secrets, so the tokens stay valid.
 func (f *fixture) run(t *testing.T, scenarios []tests.ApiScenario) {
+	f.runWith(t, nil, scenarios)
+}
+
+// runWith is run with setup applied to each test app first, to register hooks or add records.
+func (f *fixture) runWith(t *testing.T, setup func(testing.TB, core.App), scenarios []tests.ApiScenario) {
 	for _, scenario := range scenarios {
 		scenario.TestAppFactory = func(t testing.TB) *tests.TestApp {
 			app, err := tests.NewTestApp(f.dataDir)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if setup != nil {
+				setup(t, app)
 			}
 			return app
 		}

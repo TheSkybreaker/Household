@@ -25,6 +25,7 @@ type config struct {
 	vapidPublicKey  string
 	vapidPrivateKey string
 	vapidSubject    string
+	cookieDomain    string
 	dev             bool
 }
 
@@ -39,6 +40,7 @@ func loadConfig() (config, error) {
 		vapidPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
 		// webpush-go adds "mailto:" to anything that is not an https URL.
 		vapidSubject: strings.TrimPrefix(os.Getenv("VAPID_SUBJECT"), "mailto:"),
+		cookieDomain: os.Getenv("COOKIE_DOMAIN"),
 		dev:          os.Getenv("DEV") == "1",
 	}, nil
 }
@@ -96,6 +98,7 @@ func main() {
 		return se.Next()
 	})
 
+	registerCookieAuth(app, cfg)
 	registerPush(app, cfg, webpush.SendNotification)
 
 	if err := app.Start(); err != nil {
