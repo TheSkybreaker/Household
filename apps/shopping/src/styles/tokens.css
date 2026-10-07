@@ -7,7 +7,8 @@
   --sun: #F7C23A; --sun-soft: #3A3010; --sun-ink: #2B1F00;
   --danger: #FF8A80; --accent-on-ink: #1677C9; --ring: #7FCBF7;
   --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 28px -16px rgba(0, 0, 0, .8);
-  --font-d: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-b: "Atkinson Hyperlegible", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --person-sky: #3AA6E8; --person-sky-ink: #04192A; --person-sun: #F7C23A; --person-sun-ink: #2B1F00;
+  /* Conti in the profile links, with its dark theme colors. */
+  --app-cash: #23A27F; --app-cash-ink: #03201A;
   color-scheme: dark;
 }

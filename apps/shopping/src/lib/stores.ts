@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { cachedUser } from '@household/shared/session';
 import { pb, type Item, type List, type User } from './pb';
 import { isPendingDeletion } from './pending';
 import { initialNotificationState, type NotificationState } from './push';
@@ -75,7 +76,7 @@ function recordStore<T extends { id: string }>(): RecordStore<T> {
 
 function sessionStore(): SessionStore {
   return {
-    me: pb.authStore.record as User | null,
+    me: cachedUser(),
     users: {},
     online: navigator.onLine,
     installable: false,
@@ -148,7 +149,7 @@ export function registerStores() {
   Alpine.store('toast', toastStore());
 
   pb.authStore.onChange(() => {
-    session().me = pb.authStore.record as User | null;
+    session().me = (pb.authStore.record as User | null) ?? cachedUser();
   });
   addEventListener('online', () => (session().online = true));
   addEventListener('offline', () => (session().online = false));

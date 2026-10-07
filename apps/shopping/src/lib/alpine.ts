@@ -1,7 +1,8 @@
 import collapse from '@alpinejs/collapse';
 import focus from '@alpinejs/focus';
 import type { Alpine } from 'alpinejs';
-import { guardPage, isRedirecting, loginPage, refreshSession, type PageName } from './auth';
+import { appLinks } from '@household/shared/apps';
+import { checkSession, guardPage, isRedirecting, loginPage, type PageName } from './auth';
 import { composer } from './composer';
 import { homePage } from './home-page';
 import { listPage } from './list-page';
@@ -22,12 +23,17 @@ export default (Alpine: Alpine) => {
   Alpine.data('homePage', homePage);
   Alpine.data('listPage', listPage);
   Alpine.data('composer', composer);
+  Alpine.data('appLinks', appLinks);
 
   const page = document.body.dataset.page as PageName;
-  guardPage(page);
+  guardPage(page === 'login');
   if (page !== 'login' && !isRedirecting()) {
     trackConnection();
-    void refreshSession();
+    void checkSession();
     void syncPush();
+    // The other app may have signed out meanwhile.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') void checkSession();
+    });
   }
 };

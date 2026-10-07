@@ -18,7 +18,7 @@ async function currentSubscription(): Promise<PushSubscription | null> {
 }
 
 function saveSubscription(subscription: PushSubscription) {
-  return pb.send('/api/push/subscribe', { method: 'POST', body: subscription.toJSON() });
+  return pb.send('/api/push/subscribe', { method: 'POST', body: { ...subscription.toJSON(), app: 'shopping' } });
 }
 
 // The VAPID public key comes as base64url text; the Push API wants its bytes.

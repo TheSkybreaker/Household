@@ -1,10 +1,11 @@
 ---
-import Avatar from '../components/Avatar.astro';
+import AppLinks from '@household/shared/components/AppLinks.astro';
+import Avatar from '@household/shared/components/Avatar.astro';
+import Sheet from '@household/shared/components/Sheet.astro';
 import Icon from '../components/Icon.astro';
 import ListRow from '../components/ListRow.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
 import Page from '../components/Page.astro';
-import Sheet from '../components/Sheet.astro';
 import Toast from '../components/Toast.astro';
 ---
 
@@ -113,6 +114,7 @@ import Toast from '../components/Toast.astro';
           @click="toggleNotifications()"><i></i></button>
       </div>
       <p class="hint" x-show="$store.session.notifications === 'denied'">Riattivale da Impostazioni Android, app Spesa, Notifiche.</p>
+      <AppLinks current="shopping" />
       <label class="field">Il tuo nome<input x-model="nameDraft" maxlength="20" required :disabled="!$store.session.online" @change="saveName()" /></label>
       <button type="button" class="btn primary wide" x-show="$store.session.installable" @click="install()">Installa l'app</button>
       <button type="button" class="btn ghost wide" x-show="devTools" @click="sendTestPush()">Prova notifica</button>

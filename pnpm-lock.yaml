@@ -19,12 +19,6 @@ importers:
       '@astrojs/alpinejs':
         specifier: 1.0.0
         version: 1.0.0(@types/alpinejs@3.17.0)(alpinejs@3.17.4)
-      '@fontsource-variable/bricolage-grotesque':
-        specifier: 5.3.0
-        version: 5.3.0
-      '@fontsource/atkinson-hyperlegible':
-        specifier: 5.3.0
-        version: 5.3.0
       '@household/shared':
         specifier: workspace:*
         version: link:../../packages/shared

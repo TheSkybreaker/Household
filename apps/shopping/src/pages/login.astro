@@ -5,7 +5,7 @@ import Page from '../components/Page.astro';
 
 <Page page="login">
   <div class="app" x-data="loginPage" x-cloak>
-    <main class="login">
+    <main class="login" x-show="ready">
       <div class="login-mark"><Icon name="basket" /></div>
       <h1>Spesa</h1>
       <p class="login-sub">La lista della spesa di casa, aggiornata in tempo reale su tutti e due i telefoni.</p>

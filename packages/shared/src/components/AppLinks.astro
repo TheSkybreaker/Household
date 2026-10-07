@@ -1,0 +1,21 @@
+---
+import type { AppId } from '../apps';
+
+interface Props {
+  current: AppId;
+}
+
+const { current } = Astro.props;
+---
+
+<p class="flabel">Le vostre app</p>
+<div class="apps" x-data={`appLinks('${current}')`}>
+  <template x-for="link in links" :key="link.id">
+    <a class="app-ico" :href="link.url" target="_blank" rel="noopener" :aria-label="`Apri ${link.name}`">
+      <span class="tile" :class="`tile-${link.id}`">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" x-html="link.icon"></svg>
+      </span>
+      <span x-text="link.name"></span>
+    </a>
+  </template>
+</div>

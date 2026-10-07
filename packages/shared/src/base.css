@@ -1,0 +1,74 @@
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: border-box }
+[x-cloak] { display: none !important }
+html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); background: var(--bg); -webkit-text-size-adjust: 100% }
+body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font-b); font-size: 17px; line-height: 1.45; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit }
+button:disabled { cursor: default }
+input { font: inherit; color: inherit }
+:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; border-radius: 12px }
+.app { max-width: 480px; margin: 0 auto; padding: 0 18px; min-height: 100%; display: flex; flex-direction: column }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+
+/* top bar */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; background: var(--bg) }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-d); font-weight: 800; font-size: 22px; letter-spacing: -.02em }
+.brand-mark { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--panel); color: var(--panel-ink) }
+.brand-mark svg { width: 22px; height: 22px }
+.top-actions { display: flex; align-items: center; gap: 14px }
+.av-btn { border-radius: 50%; display: grid }
+
+/* avatars */
+.av { display: inline-grid; place-items: center; border-radius: 50%; font-family: var(--font-d); font-weight: 800; line-height: 1; flex: none }
+.av-sky { background: var(--person-sky); color: var(--person-sky-ink) }
+.av-sun { background: var(--person-sun); color: var(--person-sun-ink) }
+.av.xs { width: 20px; height: 20px; font-size: 11px }
+.av.md { width: 38px; height: 38px; font-size: 17px }
+.av.xl { width: 58px; height: 58px; font-size: 25px }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 50px; padding: 0 20px; border-radius: 15px; font-weight: 700 }
+.btn.primary { background: var(--btn); color: var(--btn-ink) }
+.btn.primary:disabled { opacity: .6 }
+.btn.ghost { border: 1.5px solid var(--line); color: var(--ink) }
+.btn.wide { width: 100% }
+
+/* login */
+.login { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 40px 0 32px }
+.login-mark { width: 84px; height: 84px; border-radius: 26px; background: var(--panel); color: var(--panel-ink); display: grid; place-items: center; margin-bottom: 22px }
+.login-mark svg { width: 48px; height: 48px }
+.login h1 { font-family: var(--font-d); font-weight: 800; font-size: clamp(58px, 18vw, 78px); letter-spacing: -.045em; line-height: .9; margin: 0 0 12px }
+.login-sub { font-size: 18px; color: var(--ink-2); margin: 0 0 28px; max-width: 30ch }
+.login .field input { background: var(--paper) }
+.login-error { margin: 12px 0 0; color: var(--danger); font-weight: 700; font-size: 15px }
+
+/* profile switches */
+.switch { width: 52px; height: 32px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .2s }
+.switch i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .2s }
+.switch[aria-checked="true"] { background: var(--btn) }
+.switch[aria-checked="true"] i { transform: translateX(20px) }
+.switch:disabled { opacity: .5 }
+
+/* bottom sheets */
+.grab { width: 40px; height: 5px; border-radius: 5px; background: var(--line); margin: 0 auto 16px }
+.sh-title { font-family: var(--font-d); font-weight: 800; font-size: 27px; letter-spacing: -.02em; line-height: 1.1; margin: 0 0 4px }
+.sh-head { display: flex; gap: 14px; align-items: center; margin-bottom: 18px }
+.sh-head h2 { margin: 0; font-family: var(--font-d); font-size: 25px; font-weight: 800; letter-spacing: -.02em }
+.sh-head p { margin: 0; color: var(--ink-2); font-size: 15px }
+
+/* links to the other apps, in the profile */
+.flabel { font-size: 14px; font-weight: 700; color: var(--ink-2); margin: 16px 0 8px }
+.apps { display: flex; gap: 18px; margin: 0 0 20px }
+.app-ico { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink); text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 18px }
+.app-ico .tile { width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; box-shadow: var(--shadow) }
+.app-ico .tile svg { width: 32px; height: 32px }
+.tile-shopping { background: var(--app-shopping); color: var(--app-shopping-ink) }
+.tile-cash { background: var(--app-cash); color: var(--app-cash-ink) }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important }
+}
