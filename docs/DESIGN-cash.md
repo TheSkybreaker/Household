@@ -427,7 +427,7 @@ cash.skybreaker.dev {
 }
 ```
 
-1. Il workflow Deploy guarda cosa è cambiato su `main`: `backend/` porta a test e binario; `apps/shopping/` o `packages/shared/` alla build della Spesa; `apps/cash/` o `packages/shared/` alla build di Conti.
+1. Il workflow Deploy guarda cosa è cambiato su `main` dall'ultimo deploy riuscito, così un deploy fallito riparte col push dopo: `backend/` porta a test e binario; `apps/shopping/` o `packages/shared/` alla build della Spesa; `apps/cash/` o `packages/shared/` alla build di Conti. Le build partono dopo il binario e non partono se il suo deploy è fallito.
 2. Ogni pezzo va sul server con la chiave di deploy, che può lanciare solo lo script di deploy. Il binario come oggi: SHA-256, copia del database, riavvio, binario precedente rimesso se `/api/health` non risponde. Una build come archivio tar con il suo SHA-256: scompattata in una cartella nuova, messa al posto della vecchia cambiando un link simbolico, senza riavvii.
 3. Sul server `/var/www/household/` contiene `backend/` (binario, `.env`, `pb_data`), `shopping/` e `cash/` (link simbolici alle build); il servizio systemd utente `household.service` ascolta su `127.0.0.1:8090`.
 4. Backup giornaliero cifrato del database su Google Drive, come oggi per la Spesa.

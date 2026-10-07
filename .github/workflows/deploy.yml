@@ -9,6 +9,11 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+# The changes job reads the earlier runs of this workflow.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -21,16 +26,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      # A manual run, or a push whose previous commit is unknown, deploys everything. A change to the
-      # shared package or the workspace rebuilds both apps.
+      # The diff starts from the commit of the last successful deploy, so the changes of a failed or
+      # cancelled run go out with the next push. A manual run, or a last deploy that git does not
+      # know, deploys everything. A change to the shared package or the workspace rebuilds both apps.
       - id: diff
         env:
-          BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" != push ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+          deployed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // empty' || true)
+          if [ "$GITHUB_EVENT_NAME" != push ] || [ -z "$deployed" ] || ! git cat-file -e "$deployed^{commit}" 2>/dev/null; then
             changed=$(printf 'backend/\napps/shopping/\napps/cash/\n')
           else
-            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            changed=$(git diff --name-only "$deployed" "$GITHUB_SHA")
           fi
           workspace='^(packages/shared/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'
           has() { grep -qE "$1" <<<"$changed" && echo true || echo false; }
@@ -69,16 +77,15 @@ jobs:
           user: ${{ secrets.DEPLOY_USER }}
           known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
 
+  # The apps go out after the backend they call, and not at all when its deploy failed.
   shopping:
-    needs: changes
-    if: needs.changes.outputs.shopping == 'true'
+    needs: [changes, backend]
+    if: ${{ !cancelled() && needs.changes.outputs.shopping == 'true' && (needs.backend.result == 'success' || needs.backend.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - uses: actions/setup-node@v7
         with:
@@ -103,15 +110,13 @@ jobs:
           known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
 
   cash:
-    needs: changes
-    if: needs.changes.outputs.cash == 'true'
+    needs: [changes, backend]
+    if: ${{ !cancelled() && needs.changes.outputs.cash == 'true' && (needs.backend.result == 'success' || needs.backend.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - uses: actions/setup-node@v7
         with:
