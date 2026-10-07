@@ -362,7 +362,7 @@ Il repository contiene solo il workflow; la configurazione del server vive sul s
 3. Servizio: in `/var/www/household/` la cartella `backend/` (binario, `.env`, `pb_data`) e i link `shopping` e `cash` alle build; servizio systemd utente `~/.config/systemd/user/household.service` su `127.0.0.1:8090`, con scrittura permessa solo in `pb_data`, home non leggibile e niente socket Unix, quindi niente accesso a docker. Le migrazioni partono da sole all'avvio.
 4. Caddy: blocchi `shopping.skybreaker.dev` e `cash.skybreaker.dev` in `/etc/caddy/Caddyfile`. Servono la build con `try_files`, passano `/api/*` a PocketBase senza compressione (le connessioni SSE del realtime arrivano subito), rispondono 404 su `/_/` e sulle API dei superuser, e servono `sw.js` con `Cache-Control: no-cache`. PocketBase si fida di `X-Forwarded-For` e limita i tentativi di login (migrazione `proxy_and_rate_limits`).
 5. Backup: `~/bin/household-backup.sh`, avviato ogni notte alle 3:45 da `household-backup.timer`, fa uno snapshot di `data.db`, lo cifra con age (la stessa chiave del backup di Directus, la cui identità privata sta solo sul Mac) e lo carica su Google Drive in `Backups/household`. Le istruzioni di ripristino sono in testa allo script.
-6. Dashboard: `ssh -L 8090:127.0.0.1:8090 portfolio`, poi `http://localhost:8090/_/`.
+6. Dashboard: `ssh -L 8090:127.0.0.1:8090 portfolio`, poi `http://localhost:8090/_/`. PocketBase accetta i superuser solo da `127.0.0.1` e `::1` (migrazione `superuser_ips`): da fuori sono rifiutati qualunque percorso usino.
 
 ## Milestone e criteri di accettazione
 

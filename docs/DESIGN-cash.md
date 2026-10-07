@@ -48,7 +48,7 @@ Il telefono parla solo con Caddy; il cookie sul dominio padre fa valere un login
 | Domini | `shopping.skybreaker.dev` (Spesa) e `cash.skybreaker.dev` (Conti), ognuno con la sua build statica |
 | Reverse proxy | Caddy: HTTPS automatico, serve i file statici e passa `/api/*` (realtime compreso) a PocketBase su `127.0.0.1:8090`. Ogni app chiama le API sul proprio dominio: niente CORS |
 | Backend | Un binario Go con PocketBase e un database SQLite con le collezioni di tutte e due le app; non serve file statici |
-| Dashboard admin | `/_/` e le API dei superuser non esposte sui sottodomini delle app; ci si arriva con un tunnel SSH |
+| Dashboard admin | `/_/` e le API dei superuser (per nome e per id della collezione) non esposte sui sottodomini delle app; PocketBase accetta i superuser solo da `127.0.0.1`, cioè dal tunnel SSH |
 | Login | Cookie HttpOnly sul dominio `.skybreaker.dev`, scritto e letto solo dal server (vedi sotto) |
 | Notifiche | Un service worker per sottodominio, ognuno con il suo permesso e la sua subscription |
 | Collegamenti | Nel profilo di ogni app le icone delle altre app, da una lista condivisa |

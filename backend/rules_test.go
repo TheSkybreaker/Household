@@ -305,3 +305,59 @@ func TestDeletingListDeletesItems(t *testing.T) {
 		},
 	})
 }
+
+// The dashboard is reached through an SSH tunnel to the server itself; through Caddy, superusers
+// are refused whatever path or collection id reaches PocketBase.
+func TestSuperusersOnlyFromTheServer(t *testing.T) {
+	f := newFixture(t)
+	signIn := func() *strings.Reader {
+		return strings.NewReader(`{"identity":"admin@example.test","password":"` + f.password + `"}`)
+	}
+	app, err := tests.NewTestApp(f.dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	superusers, err := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
+	app.Cleanup()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.run(t, []tests.ApiScenario{
+		{
+			Name:            "sign-in by collection name from a public address",
+			Method:          http.MethodPost,
+			URL:             "/api/collections/_superusers/auth-with-password",
+			Headers:         map[string]string{"X-Forwarded-For": "203.0.113.7"},
+			Body:            signIn(),
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+		},
+		{
+			Name:            "sign-in by collection id from a public address",
+			Method:          http.MethodPost,
+			URL:             "/api/collections/" + superusers.Id + "/auth-with-password",
+			Headers:         map[string]string{"X-Forwarded-For": "203.0.113.7"},
+			Body:            signIn(),
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+		},
+		{
+			Name:            "a superuser token used from a public address",
+			Method:          http.MethodGet,
+			URL:             "/api/settings",
+			Headers:         map[string]string{"Authorization": f.tokenSuperuser, "X-Forwarded-For": "203.0.113.7"},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+		},
+		{
+			Name:            "sign-in from the server itself",
+			Method:          http.MethodPost,
+			URL:             "/api/collections/_superusers/auth-with-password",
+			Headers:         map[string]string{"X-Forwarded-For": "127.0.0.1"},
+			Body:            signIn(),
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"token":"ey`},
+		},
+	})
+}
