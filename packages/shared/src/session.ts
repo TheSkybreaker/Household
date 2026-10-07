@@ -25,24 +25,28 @@ function writeStorage(key: string, value: string | null) {
   }
 }
 
-export function cachedUser(): User | null {
+function parseStorage<T>(key: string): T | null {
   try {
-    return JSON.parse(readStorage(USER_KEY) ?? 'null');
+    return JSON.parse(readStorage(key) ?? 'null');
   } catch {
     return null;
   }
 }
 
+const publicFields = (user: User): User => ({ id: user.id, name: user.name, username: user.username, color: user.color });
+
+// A Spesa updated while offline has not exchanged its old session yet, and still opens with it.
+export function cachedUser(): User | null {
+  const user = parseStorage<User>(USER_KEY) ?? parseStorage<{ record?: User }>(LEGACY_AUTH_KEY)?.record;
+  return user ? publicFields(user) : null;
+}
+
 function rememberUser(user: User | null) {
-  writeStorage(USER_KEY, user && JSON.stringify({ id: user.id, name: user.name, username: user.username, color: user.color }));
+  writeStorage(USER_KEY, user && JSON.stringify(publicFields(user)));
 }
 
 function legacyToken(): string {
-  try {
-    return JSON.parse(readStorage(LEGACY_AUTH_KEY) ?? '{}').token ?? '';
-  } catch {
-    return '';
-  }
+  return parseStorage<{ token?: string }>(LEGACY_AUTH_KEY)?.token ?? '';
 }
 
 const isRejected = (error: unknown) => error instanceof ClientResponseError && [401, 403, 404].includes(error.status);
@@ -82,6 +86,7 @@ export async function signOut(): Promise<boolean> {
     return false;
   }
   rememberUser(null);
+  writeStorage(LEGACY_AUTH_KEY, null);
   pb.authStore.clear();
   return true;
 }

@@ -60,6 +60,11 @@ describe('refreshSession', () => {
     expect(localStorage.getItem('pocketbase_auth')).toBeNull();
   });
 
+  it('opens offline with the user of the old localStorage session', () => {
+    localStorage.setItem('pocketbase_auth', JSON.stringify({ token: 'old-token', record }));
+    expect(cachedUser()).toEqual(publicUser);
+  });
+
   it('falls back to the cookie when the old token is expired', async () => {
     localStorage.setItem('pocketbase_auth', JSON.stringify({ token: 'expired-token', record }));
     fetchMock.mockResolvedValueOnce(json(401, { status: 401, message: 'no', data: {} })).mockResolvedValueOnce(json(200, { token: '', record }));
@@ -89,5 +94,13 @@ describe('signIn and signOut', () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
     expect(await signOut()).toBe(true);
     expect(cachedUser()).toBeNull();
+  });
+
+  it('also forgets the old localStorage session, which would sign the user back in', async () => {
+    localStorage.setItem('pocketbase_auth', JSON.stringify({ token: 'old-token', record }));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    expect(await signOut()).toBe(true);
+    expect(cachedUser()).toBeNull();
+    expect(localStorage.getItem('pocketbase_auth')).toBeNull();
   });
 });
