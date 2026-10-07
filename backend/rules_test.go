@@ -11,7 +11,8 @@ import (
 	"github.com/pocketbase/pocketbase/tools/security"
 )
 
-// fixture is a data dir with the Spesa schema, two users and a list with one item added by userA.
+// fixture is a data dir with the Spesa schema, two users, a superuser and a list with one item
+// added by userA.
 type fixture struct {
 	dataDir  string
 	password string // of both users
@@ -19,8 +20,10 @@ type fixture struct {
 	userB    *core.Record
 	tokenA   string
 	tokenB   string
-	list     *core.Record
-	item     *core.Record
+	// tokenSuperuser is of admin@example.test, whose password is also password.
+	tokenSuperuser string
+	list           *core.Record
+	item           *core.Record
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -76,6 +79,18 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f.tokenB, err = f.userB.NewAuthToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	superusers, err := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	superuser := core.NewRecord(superusers)
+	superuser.SetEmail("admin@example.test")
+	superuser.SetPassword(password)
+	f.tokenSuperuser, err = save(superuser).NewAuthToken()
 	if err != nil {
 		t.Fatal(err)
 	}

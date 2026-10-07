@@ -22,16 +22,6 @@ func authCookieFrom(res *http.Response) *http.Cookie {
 func TestCookieAuth(t *testing.T) {
 	f := newFixture(t)
 	setup := func(t testing.TB, app core.App) {
-		superusers, err := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
-		if err != nil {
-			t.Fatal(err)
-		}
-		superuser := core.NewRecord(superusers)
-		superuser.SetEmail("admin@example.test")
-		superuser.SetPassword(f.password)
-		if err := app.Save(superuser); err != nil {
-			t.Fatal(err)
-		}
 		registerCookieAuth(app, config{})
 	}
 	credentials := func(identity string) *strings.Reader {
@@ -160,6 +150,20 @@ func TestCookieAuth(t *testing.T) {
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 				if authCookieFrom(res) != nil {
 					t.Fatal("a cross-site sign-out touched the auth cookie")
+				}
+			},
+		},
+		{
+			Name:               "a superuser impersonating a user gets the token, not a cookie",
+			Method:             http.MethodPost,
+			URL:                "/api/collections/users/impersonate/" + f.userA.Id,
+			Headers:            map[string]string{"Authorization": f.tokenSuperuser},
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"token":"ey`, `"username":"usera"`},
+			NotExpectedContent: []string{`"token":""`},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				if authCookieFrom(res) != nil {
+					t.Fatal("an impersonation set the auth cookie")
 				}
 			},
 		},

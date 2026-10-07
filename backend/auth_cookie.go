@@ -41,6 +41,10 @@ func registerCookieAuth(app core.App, cfg config) {
 
 	// Sign-in and refresh write the new token into the cookie and leave it out of the response.
 	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
+		// A superuser impersonating a user, from the dashboard or the API, wants the token itself.
+		if e.Auth != nil && e.Auth.IsSuperuser() {
+			return e.Next()
+		}
 		// Posted by another site, a sign-in would put that site's account into the cookie of the apps.
 		if !isSameOrigin(e.Request) {
 			return e.ForbiddenError("Sign in from the apps.", nil)
