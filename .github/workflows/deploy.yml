@@ -10,7 +10,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.diff.outputs.backend }}
+      shopping: ${{ steps.diff.outputs.shopping }}
+      cash: ${{ steps.diff.outputs.cash }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A manual run, or a push whose previous commit is unknown, deploys everything. A change to the
+      # shared package or the workspace rebuilds both apps.
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != push ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            changed=$(printf 'backend/\napps/shopping/\napps/cash/\n')
+          else
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          fi
+          workspace='^(packages/shared/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'
+          has() { grep -qE "$1" <<<"$changed" && echo true || echo false; }
+          echo "backend=$(has '^backend/')" >> "$GITHUB_OUTPUT"
+          echo "shopping=$(has "^apps/shopping/|$workspace")" >> "$GITHUB_OUTPUT"
+          echo "cash=$(has "^apps/cash/|$workspace")" >> "$GITHUB_OUTPUT"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # The commit becomes the version: `household --version` on the server tells what is live.
+      - name: Test and build the binary
+        working-directory: backend
+        run: |
+          go vet ./...
+          go test ./...
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+            -ldflags "-s -w -X github.com/pocketbase/pocketbase.Version=$GITHUB_SHA" -o household .
+
+      - uses: ./.github/actions/ssh-deploy
+        with:
+          part: backend
+          file: backend/household
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          user: ${{ secrets.DEPLOY_USER }}
+          known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+
+  shopping:
+    needs: changes
+    if: needs.changes.outputs.shopping == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,54 +84,53 @@ jobs:
         with:
           node-version: 26
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-
-      - name: Test and build the frontend
+      - name: Test and build the Spesa
         run: |
           pnpm install --frozen-lockfile
-          pnpm --filter shopping test
+          pnpm --filter "shopping..." --if-present test
           pnpm --filter shopping build
+          tar -czf shopping.tar.gz -C apps/shopping/dist .
 
-      # The commit becomes the version: `spesa --version` on the server tells what is live.
-      - name: Test and build the binary
-        working-directory: backend
-        run: |
-          go vet ./...
-          go test ./...
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags embed -trimpath \
-            -ldflags "-s -w -X github.com/pocketbase/pocketbase.Version=$GITHUB_SHA" -o spesa .
-
-      - uses: actions/upload-artifact@v7
+      - uses: ./.github/actions/ssh-deploy
         with:
-          name: spesa
-          path: backend/spesa
-          retention-days: 7
+          part: shopping
+          file: shopping.tar.gz
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          user: ${{ secrets.DEPLOY_USER }}
+          known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
 
-  deploy:
-    needs: build
+  cash:
+    needs: changes
+    if: needs.changes.outputs.cash == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: spesa
+      - uses: actions/checkout@v7
 
-      # The key can only run the deploy script on the server, which reads the binary from stdin
-      # and checks it against the SHA-256 passed as the command.
-      - name: Deploy via SSH
-        env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Test and build Conti
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
-          ssh -i ~/.ssh/id_deploy -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "$(sha256sum spesa | cut -d' ' -f1)" < spesa
+          pnpm install --frozen-lockfile
+          pnpm --filter "cash..." --if-present test
+          pnpm --filter cash build
+          tar -czf cash.tar.gz -C apps/cash/dist .
+
+      - uses: ./.github/actions/ssh-deploy
+        with:
+          part: cash
+          file: cash.tar.gz
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          user: ${{ secrets.DEPLOY_USER }}
+          known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}

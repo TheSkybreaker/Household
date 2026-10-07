@@ -3,8 +3,8 @@ import AstroPWA from '@vite-pwa/astro';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 
-// PocketBase serves the build from its pb_public directory.
-const outDir = fileURLToPath(new URL('../../backend/pb_public', import.meta.url));
+// Caddy serves the build; the service worker build needs the same directory.
+const outDir = fileURLToPath(new URL('./dist', import.meta.url));
 
 export default defineConfig({
   output: 'static',

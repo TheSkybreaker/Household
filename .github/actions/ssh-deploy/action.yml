@@ -1,0 +1,41 @@
+name: Deploy via SSH
+description: Sends one part of the household to the server through the restricted deploy key.
+
+inputs:
+  part:
+    description: backend, shopping or cash
+    required: true
+  file:
+    description: The binary, or the tar.gz of the build
+    required: true
+  ssh-key:
+    required: true
+  host:
+    required: true
+  port:
+    required: true
+  user:
+    required: true
+  known-hosts:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # The key can only run the deploy script on the server, which checks the upload against the
+    # SHA-256 passed after the part.
+    - shell: bash
+      env:
+        PART: ${{ inputs.part }}
+        FILE: ${{ inputs.file }}
+        SSH_KEY: ${{ inputs.ssh-key }}
+        DEPLOY_HOST: ${{ inputs.host }}
+        DEPLOY_PORT: ${{ inputs.port }}
+        DEPLOY_USER: ${{ inputs.user }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+        chmod 600 ~/.ssh/id_deploy
+        printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+        ssh -i ~/.ssh/id_deploy -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "$PART $(sha256sum "$FILE" | cut -d' ' -f1)" < "$FILE"

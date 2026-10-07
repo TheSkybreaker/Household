@@ -5,15 +5,12 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"mime"
-	"net/http"
 	"os"
 	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/joho/godotenv"
 	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/spf13/cobra"
@@ -60,11 +57,6 @@ func (c config) missingVariables() []string {
 }
 
 func main() {
-	// Go does not know the web app manifest extension and would serve it as text/plain.
-	if err := mime.AddExtensionType(".webmanifest", "application/manifest+json"); err != nil {
-		log.Fatal(err)
-	}
-
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -94,7 +86,6 @@ func main() {
 			return fmt.Errorf("missing environment variables: %s (generate the keys with `go run . vapid`)", strings.Join(missing, ", "))
 		}
 
-		se.Router.GET("/{path...}", serveStatic(publicFiles()))
 		return se.Next()
 	})
 
@@ -103,27 +94,5 @@ func main() {
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
-	}
-}
-
-// serveStatic serves the Astro build. apis.Static redirects a directory path to its trailing
-// slash form but drops the query string, and "/lista?id=<id>" carries the list id there.
-func serveStatic(fsys fs.FS) func(*core.RequestEvent) error {
-	static := apis.Static(fsys, false)
-
-	return func(e *core.RequestEvent) error {
-		url := e.Request.URL
-		if !strings.HasSuffix(url.Path, "/") {
-			info, err := fs.Stat(fsys, e.Request.PathValue(apis.StaticWildcardParam))
-			if err == nil && info.IsDir() {
-				target := url.Path + "/"
-				if url.RawQuery != "" {
-					target += "?" + url.RawQuery
-				}
-				return e.Redirect(http.StatusMovedPermanently, target)
-			}
-		}
-
-		return static(e)
 	}
 }

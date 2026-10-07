@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -288,59 +287,6 @@ func TestDeletingListDeletesItems(t *testing.T) {
 					t.Fatal("the item survived the deletion of its list")
 				}
 			},
-		},
-	})
-}
-
-func TestStaticKeepsQueryOnDirectoryRedirect(t *testing.T) {
-	f := newFixture(t)
-	publicFiles := fstest.MapFS{
-		"index.html":       {Data: []byte("home")},
-		"lista/index.html": {Data: []byte("list page")},
-	}
-	registerStatic := func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-		e.Router.GET("/{path...}", serveStatic(publicFiles))
-	}
-	expectLocation := func(location string) func(testing.TB, *tests.TestApp, *http.Response) {
-		return func(t testing.TB, app *tests.TestApp, res *http.Response) {
-			if got := res.Header.Get("Location"); got != location {
-				t.Fatalf("Location = %q, want %q", got, location)
-			}
-		}
-	}
-
-	f.run(t, []tests.ApiScenario{
-		{
-			Name:           "directory without slash keeps the list id",
-			Method:         http.MethodGet,
-			URL:            "/lista?id=abc123",
-			BeforeTestFunc: registerStatic,
-			ExpectedStatus: 301,
-			AfterTestFunc:  expectLocation("/lista/?id=abc123"),
-		},
-		{
-			Name:           "directory without slash and without query",
-			Method:         http.MethodGet,
-			URL:            "/lista",
-			BeforeTestFunc: registerStatic,
-			ExpectedStatus: 301,
-			AfterTestFunc:  expectLocation("/lista/"),
-		},
-		{
-			Name:            "directory with slash serves its index",
-			Method:          http.MethodGet,
-			URL:             "/lista/?id=abc123",
-			BeforeTestFunc:  registerStatic,
-			ExpectedStatus:  200,
-			ExpectedContent: []string{"list page"},
-		},
-		{
-			Name:            "unknown path is not found",
-			Method:          http.MethodGet,
-			URL:             "/missing",
-			BeforeTestFunc:  registerStatic,
-			ExpectedStatus:  404,
-			ExpectedContent: []string{`"data":{}`},
 		},
 	})
 }
