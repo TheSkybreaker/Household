@@ -484,6 +484,6 @@ Quattro punti da chiudere prima della milestone 3; il resto aspetta.
 - [ ] Modifica di un movimento: la demo permette solo di eliminarlo e rifarlo. Se serve nella v1, stesso pannello di Aggiungi precompilato.
 - [ ] Saldo totale della cassa (tutti i risparmi più i rimasti del mese): oggi non si vede da nessuna parte.
 - [ ] Saldi iniziali delle buste di risparmio: per ora si impostano a mano nella dashboard (`opening_balance`).
-- [ ] Design doc della Spesa da allineare a questo per sottodominio, login con cookie e push per app.
+- [x] Design doc della Spesa da allineare a questo per sottodominio, login con cookie e push per app.
 
 Dopo la v1: riordinare le buste trascinandole, più di 6 buste, esportazione in CSV, promemoria per la quota non ancora versata a metà mese.

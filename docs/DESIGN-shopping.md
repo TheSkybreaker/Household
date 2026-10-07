@@ -38,12 +38,12 @@ Un solo binario Go serve API e frontend statico sullo stesso dominio: niente COR
 |---|---|---|
 | Backend | PocketBase usato come framework Go | Auth, SQLite, realtime, dashboard admin |
 | Push | `github.com/SherClockHolmes/webpush-go` | Cifratura del payload e firma VAPID, che gli hook JS non sanno fare |
-| Frontend | Astro in output statico | Build dentro `backend/pb_public` |
+| Frontend | Astro in output statico | Build in `apps/shopping/dist`, servita da Caddy |
 | Interattività | Alpine.js con l'integrazione @astrojs/alpinejs | Caricato su ogni pagina; stato in Alpine.store, logica in Alpine.data |
-| Client API | SDK JS `pocketbase` | Auth store in localStorage, realtime via SSE |
+| Client API | SDK JS `pocketbase` | Sessione nel cookie HttpOnly del server (vedi `docs/DESIGN-cash.md`), realtime via SSE |
 | PWA | `@vite-pwa/astro` con strategia `injectManifest` | Service worker scritto a mano per push e click |
 | Font | Pacchetti Fontsource, self-hosted | Funzionano offline, niente Google Fonts a runtime |
-| Hosting | Server personale `portfolio`, Caddy davanti, servizio systemd utente | HTTPS obbligatorio per service worker e push |
+| Hosting | Server personale `portfolio`, Caddy che serve la build e passa `/api/*` a PocketBase, servizio systemd utente | HTTPS obbligatorio per service worker e push |
 
 Flusso di un'aggiunta: il telefono A crea un record in `items`. PocketBase lo salva, lo manda in realtime ai client connessi e lancia l'hook Go. L'hook invia una Web Push alle subscription del telefono B, Chrome la consegna al service worker di B, che mostra la notifica oppure la salta se l'app è in primo piano.
 
@@ -62,31 +62,32 @@ Ad app aperta l'aggiornamento arriva subito via SSE; la push passa dal push serv
 
 ## Struttura del repository
 
-Monorepo con backend Go e frontend Astro separati; la build del frontend finisce dentro il backend.
+Monorepo pnpm condiviso con Conti: backend Go, le due app Astro e un pacchetto comune. La struttura completa è in `docs/DESIGN-cash.md`; qui la parte della Spesa.
 
 ```text
-spesa/
-  backend/
-    main.go            avvio PocketBase, hook, route, comando vapid
-    push.go            invio Web Push, pulizia subscription
-    routes.go          /api/push/*
-    migrations/        schema delle collezioni
-    pb_public/         output della build Astro (non versionato)
-    pb_data/           database e file (non versionato)
-  apps/shopping/
-    astro.config.mjs   outDir: ../../backend/pb_public
-    src/
-      pages/           index.astro, login.astro, lista.astro
-      components/      componenti .astro con direttive Alpine
-      lib/             alpine.ts, pb.ts, auth.ts, dates.ts, parse.ts, push.ts, realtime.ts
-      styles/          tokens.css, base.css
-      sw.ts            service worker
-    public/icons/      icone app e badge notifiche
-  .github/workflows/   deploy.yml: test, build e deploy a ogni push su main
-  docs/                DESIGN-shopping.md (questo documento), demo-shopping.html
+backend/
+  main.go              avvio PocketBase, route, comando vapid
+  auth_cookie.go       cookie HttpOnly della sessione
+  push.go              invio Web Push, pulizia subscription
+  push_routes.go       /api/push/*
+  shopping_hooks.go    push per gli elementi aggiunti
+  migrations/          schema delle collezioni
+  pb_data/             database e file (non versionato)
+apps/shopping/
+  astro.config.mjs     build in dist
+  src/
+    pages/             index.astro, login.astro, lista.astro
+    components/        componenti .astro con direttive Alpine
+    lib/               alpine.ts, pb.ts, auth.ts, dates.ts, parse.ts, push.ts, realtime.ts
+    styles/            tokens.css, base.css
+    sw.ts              service worker
+  public/icons/        icone app e badge notifiche
+packages/shared/       sessione, date, app, componenti e stili comuni con Conti
+.github/workflows/     deploy.yml: test, build e deploy di quello che cambia a ogni push su main
+docs/                  DESIGN-shopping.md (questo documento), demo-shopping.html
 ```
 
-Il dettaglio di una lista è `/lista?id=<id>`, non `/lista/<id>`: in output statico Astro non può generare pagine per id che non conosce. Verifica che PocketBase serva `lista/index.html` per `/lista`.
+Il dettaglio di una lista è `/lista?id=<id>`, non `/lista/<id>`: in output statico Astro non può generare pagine per id che non conosce. Caddy serve `lista/index.html` per `/lista` con `try_files`, tenendo la query.
 
 ## Modello dati e regole API
 
@@ -154,11 +155,11 @@ Tutte le regole bloccate: la collezione la toccano solo le route custom e l'hook
 
 Due account creati una volta sul server, con nome utente e password generati; l'app ha solo il login.
 
-- Nessuna pagina di registrazione né di reset password nella v1: le password si cambiano dalla dashboard (`/_/`, collezione users, campo password).
+- Nessuna pagina di registrazione né di reset password nella v1: le password si cambiano dalla dashboard, raggiungibile solo con il tunnel SSH (collezione users, campo password).
 - Login con `authWithPassword` e il nome utente in minuscolo, perché la tastiera del telefono può mettere la maiuscola; in caso di errore, messaggio sotto il pulsante: Nome utente o password non corretti.
-- Lo store dell'SDK tiene il token in localStorage. All'avvio, se il token è valido, chiama `authRefresh()`; se fallisce, svuota lo store e vai a `/login`.
-- Guardie lato client: `/` e `/lista` senza sessione portano a `/login`; `/login` con sessione valida porta a `/`.
-- Esci: prima cancella la subscription push del dispositivo con `POST /api/push/unsubscribe`, poi `pb.authStore.clear()` e vai a `/login`.
+- La sessione sta nel cookie HttpOnly condiviso con Conti (`docs/DESIGN-cash.md`, Login condiviso): all'avvio e al ritorno in primo piano `authRefresh()`, che rinnova il cookie; un rifiuto porta a `/login`, senza rete vale l'ultimo utente salvato. Chi aveva il token in localStorage lo scambia una volta con il cookie.
+- Guardie lato client: `/` e `/lista` senza utente salvato portano a `/login`; `/login` controlla il cookie e, se la sessione c'è già (anche per un accesso fatto in Conti), porta a `/`.
+- Esci: prima cancella la subscription push del dispositivo con `POST /api/push/unsubscribe`, poi `POST /api/auth/logout` cancella il cookie (esce anche da Conti) e vai a `/login`. Senza rete non si può uscire: toast Non salvato, riprova.
 - Nel profilo ognuno può cambiare solo il proprio nome.
 
 ## Realtime
@@ -183,7 +184,7 @@ Tutte richiedono un utente autenticato.
 | Metodo e percorso | Cosa fa |
 |---|---|
 | GET /api/push/key | Restituisce la chiave pubblica VAPID |
-| POST /api/push/subscribe | Riceve la subscription del browser, fa upsert per `endpoint` e la assegna all'utente autenticato |
+| POST /api/push/subscribe | Riceve la subscription del browser con `app = shopping`, fa upsert per `endpoint` e la assegna all'utente autenticato |
 | POST /api/push/unsubscribe | Riceve `{ endpoint }` ed elimina la subscription se appartiene all'utente |
 | POST /api/push/test | Solo con `DEV=1`: manda una push di prova ai dispositivi dell'utente stesso, con `type` test, che il service worker mostra anche con l'app aperta |
 
@@ -341,13 +342,14 @@ In sviluppo bastano un PC e un telefono via USB; in produzione il server `portfo
 | VAPID_PRIVATE_KEY | generata | Segreta, mai nel repository |
 | VAPID_SUBJECT | indirizzo di contatto | Richiesto dai push service; anche un URL https. `mailto:` lo aggiunge `webpush-go` |
 | DEV | 1 | Abilita `/api/push/test` e l'automigrate |
+| COOKIE_DOMAIN | `.skybreaker.dev` | Dominio del cookie della sessione condivisa con Conti; vuoto in sviluppo |
 
 Il comando `vapid` stampa una coppia di chiavi con `webpush.GenerateVAPIDKeys()`. In locale le variabili stanno in un `.env` ignorato da git.
 
 ### Sviluppo
 
 1. `go run . serve` avvia PocketBase su `:8090`; la dashboard è su `/_/` e lì si creano i due utenti.
-2. `pnpm dev` in `apps/shopping/` avvia Astro su `:4321`, con un proxy Vite da `/api` verso `:8090`: il client usa sempre lo stesso origin.
+2. `pnpm --filter shopping dev` avvia Astro su `:4321`, con un proxy Vite da `/api` verso `:8090`: il client usa sempre lo stesso origin.
 3. `@vite-pwa/astro` con `devOptions` attivi, per avere il service worker anche in sviluppo.
 4. Telefono via USB: `chrome://inspect` sul PC con port forwarding della porta 4321. Sul telefono `localhost` è un contesto sicuro, quindi service worker e push funzionano senza HTTPS.
 
@@ -355,11 +357,12 @@ Il comando `vapid` stampa una coppia di chiavi con `webpush.GenerateVAPIDKeys()`
 
 Il repository contiene solo il workflow; la configurazione del server vive sul server, nei percorsi qui sotto.
 
-1. Build: `pnpm build` in `apps/shopping/` scrive in `backend/pb_public`, poi `go build -tags embed` produce un unico binario con il frontend incorporato. Senza il tag il binario legge `pb_public` dal disco, come in sviluppo.
-2. Deploy: a ogni push su `main` il workflow `Deploy` esegue test e build, poi manda il binario Linux via SSH con una chiave che può lanciare solo `~/bin/deploy-spesa.sh`. Lo script controlla lo SHA-256, salva il database in `predeploy.db`, sostituisce il binario, riavvia il servizio e rimette il binario precedente se `/api/health` non risponde. Il commit diventa la versione del binario: `/var/www/spesa/spesa --version` dice cosa è in produzione. Segreti del repository: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USER`, `DEPLOY_KNOWN_HOSTS`.
-3. Servizio: binario, `.env` e `pb_data` in `/var/www/spesa`, servizio systemd utente `~/.config/systemd/user/spesa.service` in ascolto su `127.0.0.1:8090`, con scrittura permessa solo in `pb_data`, home non leggibile e niente socket Unix, quindi niente accesso a docker. Le migrazioni partono da sole all'avvio.
-4. Caddy: blocco `shopping.skybreaker.dev` in `/etc/caddy/Caddyfile` con `reverse_proxy` e compressione esclusa per `/api/*`, così le connessioni SSE del realtime arrivano subito. PocketBase si fida di `X-Forwarded-For` e limita i tentativi di login (migrazione `proxy_and_rate_limits`).
-5. Backup: `~/bin/spesa-backup.sh`, avviato ogni notte alle 3:45 da `spesa-backup.timer`, fa uno snapshot di `data.db`, lo cifra con age (la stessa chiave del backup di Directus, la cui identità privata sta solo sul Mac) e lo carica su Google Drive in `Backups/spesa`. Le istruzioni di ripristino sono in testa allo script.
+1. Build: `pnpm --filter shopping build` scrive la Spesa in `apps/shopping/dist`; il backend è un binario Go a parte (`go build` in `backend/`).
+2. Deploy: a ogni push su `main` il workflow `Deploy` guarda cosa è cambiato e pubblica solo quello, con una chiave che può lanciare solo `~/bin/deploy-household.sh`. Il binario: SHA-256, copia del database in `predeploy.db`, riavvio, binario precedente rimesso se `/api/health` non risponde; `household --version` dice quale commit è in produzione. La build: archivio con SHA-256, scompattato in `releases/` e messo al posto del precedente cambiando un link simbolico, senza riavvii. Segreti del repository: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USER`, `DEPLOY_KNOWN_HOSTS`.
+3. Servizio: in `/var/www/household/` la cartella `backend/` (binario, `.env`, `pb_data`) e i link `shopping` e `cash` alle build; servizio systemd utente `~/.config/systemd/user/household.service` su `127.0.0.1:8090`, con scrittura permessa solo in `pb_data`, home non leggibile e niente socket Unix, quindi niente accesso a docker. Le migrazioni partono da sole all'avvio.
+4. Caddy: blocchi `shopping.skybreaker.dev` e `cash.skybreaker.dev` in `/etc/caddy/Caddyfile`. Servono la build con `try_files`, passano `/api/*` a PocketBase senza compressione (le connessioni SSE del realtime arrivano subito), rispondono 404 su `/_/` e sulle API dei superuser, e servono `sw.js` con `Cache-Control: no-cache`. PocketBase si fida di `X-Forwarded-For` e limita i tentativi di login (migrazione `proxy_and_rate_limits`).
+5. Backup: `~/bin/household-backup.sh`, avviato ogni notte alle 3:45 da `household-backup.timer`, fa uno snapshot di `data.db`, lo cifra con age (la stessa chiave del backup di Directus, la cui identità privata sta solo sul Mac) e lo carica su Google Drive in `Backups/household`. Le istruzioni di ripristino sono in testa allo script.
+6. Dashboard: `ssh -L 8090:127.0.0.1:8090 portfolio`, poi `http://localhost:8090/_/`.
 
 ## Milestone e criteri di accettazione
 

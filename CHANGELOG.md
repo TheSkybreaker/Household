@@ -1,5 +1,10 @@
 # Changelog
 
+## Conti milestone 1: shared infrastructure
+
+- pnpm monorepo with the Spesa in `apps/shopping`, Conti in `apps/cash` (login and profile) and `packages/shared` (session client, amounts, dates, app list, shared components and styles); the backend is the Go module `household` and no longer serves files.
+- One login for both apps in an HttpOnly cookie on `.skybreaker.dev`, accepted only on same-origin requests; push subscriptions per app; Caddy serves the two builds, hides the dashboard, and the workflow deploys only what changed.
+
 ## Production
 
 - Sign in with a username instead of an email (lowercased on the login page), trusted `X-Forwarded-For` from Caddy and PocketBase rate limits on, and `VAPID_SUBJECT` accepted with or without `mailto:`.
