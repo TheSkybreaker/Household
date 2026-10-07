@@ -8,6 +8,37 @@ importers:
 
   .: {}
 
+  apps/cash:
+    dependencies:
+      '@alpinejs/focus':
+        specifier: 3.17.4
+        version: 3.17.4
+      '@astrojs/alpinejs':
+        specifier: 1.0.0
+        version: 1.0.0(@types/alpinejs@3.17.0)(alpinejs@3.17.4)
+      '@household/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      alpinejs:
+        specifier: 3.17.4
+        version: 3.17.4
+      astro:
+        specifier: 7.3.5
+        version: 7.3.5(terser@5.51.2)(yaml@2.9.1)
+    devDependencies:
+      '@astrojs/check':
+        specifier: 0.9.10
+        version: 0.9.10(@emnapi/runtime@1.11.3)(prettier@3.9.9)(typescript@6.0.3)
+      '@types/alpinejs':
+        specifier: 3.17.0
+        version: 3.17.0
+      '@types/alpinejs__focus':
+        specifier: 3.13.4
+        version: 3.13.4
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   apps/shopping:
     dependencies:
       '@alpinejs/collapse':

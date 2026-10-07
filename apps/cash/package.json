@@ -1,0 +1,23 @@
+{
+  "name": "cash",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@alpinejs/focus": "3.17.4",
+    "@astrojs/alpinejs": "1.0.0",
+    "@household/shared": "workspace:*",
+    "alpinejs": "3.17.4",
+    "astro": "7.3.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@types/alpinejs": "3.17.0",
+    "@types/alpinejs__focus": "3.13.4",
+    "typescript": "6.0.3"
+  }
+}

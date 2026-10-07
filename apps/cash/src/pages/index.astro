@@ -1,0 +1,35 @@
+---
+import AppLinks from '@household/shared/components/AppLinks.astro';
+import Avatar from '@household/shared/components/Avatar.astro';
+import Sheet from '@household/shared/components/Sheet.astro';
+import Icon from '../components/Icon.astro';
+import Page from '../components/Page.astro';
+---
+
+<Page page="home">
+  <div class="app" x-data="homePage" x-cloak>
+    <header class="top">
+      <div class="brand"><span class="brand-mark"><Icon name="coins" /></span><span>Conti</span></div>
+      <div class="top-actions">
+        <button type="button" class="av-btn" aria-label="Profilo" @click="sheet = 'profile'">
+          <Avatar user="$store.session.me?.id" size="md" />
+        </button>
+      </div>
+    </header>
+
+    <div class="backdrop" :class="{ 'is-on': sheet }" @click="sheet = null"></div>
+
+    <Sheet open="sheet === 'profile'" close="sheet = null" label="Profilo">
+      <div class="sh-head">
+        <Avatar user="$store.session.me?.id" size="xl" />
+        <div>
+          <h2 tabindex="-1" autofocus x-text="$store.session.me?.name"></h2>
+          <p x-text="$store.session.me?.username"></p>
+        </div>
+      </div>
+      <AppLinks current="cash" />
+      <p class="hint">Lo stesso accesso vale per tutte e due le app; uscendo da una esci anche dall'altra.</p>
+      <button type="button" class="btn ghost wide" :disabled="!$store.session.online" @click="logout()">Esci</button>
+    </Sheet>
+  </div>
+</Page>

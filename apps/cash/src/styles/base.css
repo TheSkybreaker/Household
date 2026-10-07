@@ -1,0 +1,14 @@
+.login-sub { max-width: 32ch }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 700; color: var(--ink-2); margin-top: 14px; min-width: 0 }
+.field input { height: 50px; width: 100%; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); padding: 0 14px; font-size: 17px; color: var(--ink); font-weight: 400; outline: none }
+.field input:focus { border-color: var(--btn) }
+.save { margin-top: 20px }
+.hint { font-size: 14px; color: var(--ink-2); margin: 12px 0 18px }
+.btn:disabled { opacity: .5 }
+
+/* bottom sheets */
+.backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(3, 25, 20, .45); opacity: 0; pointer-events: none; transition: opacity .25s }
+.backdrop.is-on { opacity: 1; pointer-events: auto }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 480px; margin: 0 auto; max-height: 90%; overflow: auto; background: var(--paper); border-radius: 28px 28px 0 0; padding: 10px 20px calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateY(105%); visibility: hidden; transition: transform .32s cubic-bezier(.2, .9, .3, 1), visibility 0s linear .32s }
+.sheet.is-on { transform: none; visibility: visible; transition: transform .32s cubic-bezier(.2, .9, .3, 1), visibility 0s }
+.sheet:focus { outline: none }

@@ -1,0 +1,28 @@
+/* Values of the design doc, light by default and dark with the system setting. */
+:root {
+  --bg: #ECF6F2; --paper: #FFFFFF; --ink: #0E3530; --ink-2: #4C6E67; --line: #D2E6DF; --grid: #E3EEEA;
+  --panel: #36C49D; --panel-ink: #04281F;
+  --accent-text: #0B7A62; --accent-soft: #D9F1E9;
+  --btn: #0C7F66; --btn-ink: #FFFFFF;
+  --in-soft: #E9E6FB; --in-text: #4F42B5;
+  --danger: #C23B34; --ring: #0B7A62;
+  --person-sky: #1677C9; --person-sky-ink: #FFFFFF; --person-sun: #F7B500; --person-sun-ink: #3D2C00;
+  --app-shopping: #3AA6E8; --app-shopping-ink: #06283F;
+  --shadow: 0 1px 0 rgba(14, 53, 48, .05), 0 10px 26px -16px rgba(14, 53, 48, .35);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #061815; --paper: #0E2723; --ink: #E1F4EE; --ink-2: #8CB2A8; --line: #1B3C35; --grid: #16332D;
+    --panel: #23A27F; --panel-ink: #03201A;
+    --accent-text: #6FDDBE; --accent-soft: #113730;
+    --btn: #34C7A0; --btn-ink: #03231B;
+    --in-soft: #231F45; --in-text: #B9B1F5;
+    --danger: #FF8A80; --ring: #6FDDBE;
+    --person-sky: #3AA6E8; --person-sky-ink: #04192A; --person-sun: #F7C23A; --person-sun-ink: #2B1F00;
+    --app-shopping: #2F95D4; --app-shopping-ink: #04192A;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 28px -16px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
