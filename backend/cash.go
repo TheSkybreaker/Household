@@ -16,7 +16,9 @@ type cashBook struct {
 
 // registerCash binds Conti to the app; now is time.Now outside the tests.
 func registerCash(app core.App, cfg config, now func() time.Time) *cashBook {
-	return &cashBook{app: app, loc: cfg.location, now: now}
+	c := &cashBook{app: app, loc: cfg.location, now: now}
+	c.registerHooks()
+	return c
 }
 
 // today is the calendar day in the app time zone, as YYYY-MM-DD.
