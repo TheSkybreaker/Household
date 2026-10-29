@@ -131,7 +131,8 @@ func loadLedger(app core.App) (*ledger, error) {
 	}
 
 	var quotas []quotaRow
-	if err := db.NewQuery("SELECT q.id, m.month, q.user, q.amount, q.paid_on FROM month_quotas q JOIN months m ON m.id = q.month ORDER BY q.created, q.id").All(&quotas); err != nil {
+	// By username: rows saved in the same millisecond share created, and the order must not move.
+	if err := db.NewQuery("SELECT q.id, m.month, q.user, q.amount, q.paid_on FROM month_quotas q JOIN months m ON m.id = q.month JOIN users u ON u.id = q.user ORDER BY u.username").All(&quotas); err != nil {
 		return nil, err
 	}
 	for _, quota := range quotas {
