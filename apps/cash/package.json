@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro check && astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@alpinejs/focus": "3.17.4",
@@ -18,6 +19,7 @@
     "@astrojs/check": "0.9.10",
     "@types/alpinejs": "3.17.0",
     "@types/alpinejs__focus": "3.13.4",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
   }
 }

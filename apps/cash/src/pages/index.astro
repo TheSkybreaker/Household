@@ -30,6 +30,7 @@ import Page from '../components/Page.astro';
       <AppLinks current="cash" />
       <p class="hint">Lo stesso accesso vale per tutte e due le app; uscendo da una esci anche dall'altra.</p>
       <button type="button" class="btn ghost wide" :disabled="!$store.session.online" @click="logout()">Esci</button>
+      <p class="hint" role="alert" x-show="logoutFailed">Non salvato, riprova</p>
     </Sheet>
   </div>
 </Page>

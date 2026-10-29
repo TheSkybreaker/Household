@@ -4,9 +4,11 @@ import { signOut } from '@household/shared/session';
 export function homePage() {
   return {
     sheet: null as 'profile' | null,
+    logoutFailed: false,
 
     async logout() {
-      if (await signOut()) redirect('/login/');
+      this.logoutFailed = !(await signOut());
+      if (!this.logoutFailed) redirect('/login/');
     },
   };
 }

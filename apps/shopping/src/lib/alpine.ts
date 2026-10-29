@@ -3,6 +3,7 @@ import focus from '@alpinejs/focus';
 import type { Alpine } from 'alpinejs';
 import { appLinks } from '@household/shared/apps';
 import { checkSession, guardPage, isRedirecting, loginPage, type PageName } from './auth';
+import { clearCache } from './cache';
 import { composer } from './composer';
 import { homePage } from './home-page';
 import { listPage } from './list-page';
@@ -29,11 +30,11 @@ export default (Alpine: Alpine) => {
   guardPage(page === 'login');
   if (page !== 'login' && !isRedirecting()) {
     trackConnection();
-    void checkSession();
+    void checkSession(clearCache);
     void syncPush();
     // The other app may have signed out meanwhile.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') void checkSession();
+      if (document.visibilityState === 'visible') void checkSession(clearCache);
     });
   }
 };

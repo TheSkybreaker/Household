@@ -18,9 +18,12 @@ export function guardPage(isLoginPage: boolean) {
   if (!isLoginPage && !cachedUser()) redirect('/login/');
 }
 
-// Confirms the session in the background: a rejected cookie sends the app to the login page.
-export async function checkSession() {
-  if ((await refreshSession()) === 'signed-out') redirect('/login/');
+// Confirms the session in the background: a rejected cookie, for example after Esci in the other
+// app, sends the app to the login page after forgetSession drops what it kept for that session.
+export async function checkSession(forgetSession?: () => void) {
+  if ((await refreshSession()) !== 'signed-out') return;
+  forgetSession?.();
+  redirect('/login/');
 }
 
 export function loginPage() {
