@@ -1,5 +1,10 @@
 # Changelog
 
+## Spesa: cose non prese
+
+- A new list can take over what is still to buy on the latest list up to today: one batch creates the list and the copies and marks the old items as taken, all or nothing. The Passate show only the last 30 days.
+- Items one person adds to a list within 3 seconds go out as one push with every name; the Spesa login shows the update prompt, and the first new service worker replaces the old Spesa at once.
+
 ## Conti milestone 2: backend
 
 - The five Conti collections with their rules, every write checked on the server (dates in Rome time, envelopes that no longer exist, the current month only for the split), and `GET /api/cash/summary` with each month's money in and out, envelopes, pies, savings series and the money really in the box.

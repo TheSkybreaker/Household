@@ -9,7 +9,8 @@ Spesa è una PWA mobile first per una lista della spesa condivisa tra due person
 Obiettivi della v1:
 
 - Login con nome utente e password, sessione che dura mesi.
-- Liste per data con titolo facoltativo, divise in In programma e Passate.
+- Liste per data con titolo facoltativo, divise in In programma e Passate (solo quelle degli ultimi 30 giorni; le più vecchie restano nel database).
+- Una lista nuova può prendere le cose non prese dell'ultima lista fino a oggi: nella lista vecchia risultano prese.
 - Elementi con quantità facoltativa, spunta, modifica, eliminazione con annulla.
 - Aggiornamenti in tempo reale tra i due telefoni ad app aperta.
 - Notifiche push di sistema ad app chiusa, solo per le aggiunte fatte dall'altra persona.
@@ -190,7 +191,7 @@ Tutte richiedono un utente autenticato.
 
 ### Invio dal backend
 
-- Hook dopo la creazione riuscita di un record `items`. L'invio parte in una goroutine, così la risposta al client non aspetta le push.
+- Hook dopo la creazione riuscita di un record `items`. Le cose aggiunte dalla stessa persona alla stessa lista entro 3 secondi dalla prima partono in una push sola, con tutti i nomi: una lista nuova che prende le cose non prese, o una serie di aggiunte di fila, fa suonare il telefono una volta. L'invio parte dopo l'attesa, quindi la risposta al client non aspetta le push.
 - Destinatari: tutte le subscription con `user` diverso da `added_by`.
 - Opzioni di `webpush-go`: TTL 12 ore, urgenza `high` (i telefoni in risparmio energetico non la ritardano), `Topic` uguale all'id della lista, subscriber da `VAPID_SUBJECT`. Con il `Topic`, il push service sostituisce i messaggi della stessa lista non ancora consegnati.
 - Risposta 404 o 410: elimina la subscription. Altri errori: solo log, nessun retry.
@@ -205,6 +206,7 @@ Payload, sotto i 4 KB:
   "listDate": "2026-10-03",
   "item": "Pane",
   "qty": "2",
+  "items": ["Latte", "Pane"],
   "by": "Vittorio"
 }
 ```
@@ -212,7 +214,7 @@ Payload, sotto i 4 KB:
 ### Service worker
 
 - Evento `push`: se una finestra dell'app è visibile (`clients.matchAll({ type: 'window', includeUncontrolled: true })` con `visibilityState === 'visible'`), non mostrare nulla, ci pensa il realtime. Chrome lo accetta solo se la pagina è davvero in primo piano.
-- Altrimenti cerca con `registration.getNotifications({ tag: listId })` una notifica già aperta per la stessa lista, unisci gli elementi in `data.items` e sostituiscila.
+- Altrimenti cerca con `registration.getNotifications({ tag: listId })` una notifica già aperta per la stessa lista, aggiungi in `data.items` gli elementi di `items` (o `item`, se la push non ha l'elenco) e sostituiscila.
 - Un elemento: titolo {by} ha aggiunto {item}, testo {listTitle}, {data}. Più elementi: titolo {by} ha aggiunto {n} cose, testo con gli elementi separati da virgola e poi Lista: {listTitle}. La data è oggi, domani o il giorno esteso, calcolati sulla data del telefono.
 - Opzioni: `tag` uguale a listId, `renotify: true`, `icon` `/icons/icon-192.png`, `badge` `/icons/badge-96.png` (bianco su trasparente, Android usa solo il canale alpha), `vibrate: [80, 40, 80]`, azione Apri lista.
 - Evento `notificationclick`: chiude la notifica, mette a fuoco una finestra già aperta e la porta su `/lista?id=<listId>`, altrimenti ne apre una nuova.
@@ -244,9 +246,9 @@ Tre pagine e tre pannelli dal basso, con l'aspetto e i comportamenti della demo.
 | Vista | Contenuto | Azioni |
 |---|---|---|
 | Login (`/login`) | Logo, titolo Spesa grande, sottotitolo, nome utente, password | Entra |
-| Home (`/`) | Saluto, riepilogo, card notifiche se spente, In programma (data da oggi in poi, crescente), Passate richiudibile (decrescente) | Apri lista, Nuova lista, profilo |
+| Home (`/`) | Saluto, riepilogo, card notifiche se spente, In programma (data da oggi in poi, crescente), Passate degli ultimi 30 giorni, richiudibile (decrescente) | Apri lista, Nuova lista, profilo |
 | Lista (`/lista?id=`) | Pannello azzurro con giorno gigante, giorno della settimana, mese, pillola Oggi, Domani o Ieri, titolo e avanzamento; poi Da prendere e Nel carrello | Aggiungi, spunta, modifica, elimina, menu |
-| Pannello Nuova lista | Chip Oggi, Domani, Sabato (senza doppioni), selettore data, nome facoltativo | Crea lista: apre la lista con il focus sul campo |
+| Pannello Nuova lista | Chip Oggi, Domani, Sabato (senza doppioni), selettore data, nome facoltativo; se l'ultima lista fino a oggi ha cose da prendere, la riga del riporto con un interruttore, attivo di default | Crea lista: in un'unica richiesta batch crea la lista e, con il riporto attivo, una copia di ogni cosa non presa (fino a 100), segnando prese quelle vecchie; poi apre la lista con il focus sul campo |
 | Pannello Menu lista | Titolo e data della lista | Togli le cose già prese (n); Elimina la lista con secondo tocco di conferma |
 | Pannello Modifica | Nome e quantità facoltativa dell'elemento, già compilati | Salva |
 | Pannello Profilo | Avatar, nome modificabile, nome utente, switch notifiche, Installa l'app | Esci |
@@ -325,6 +327,7 @@ Frasi brevi, iniziale maiuscola e il resto minuscolo, niente punti esclamativi; 
 | Avanzamento | {n} da prendere, {m} nel carrello / Tutto nel carrello / Ancora vuota |
 | Campo di inserimento | Aggiungi, es. 2 latte |
 | Nuova lista, nome | Es. Esselunga, cena di venerdì |
+| Nuova lista, riporto | Porta le {n} cose non prese di {giorno} / Porta la cosa non presa di {giorno}; il giorno è oggi, ieri o il giorno della settimana con il numero |
 | Pannello modifica | Modifica / Nome / Quantità facoltativa / Salva |
 | Toast | È già in lista / Rimesso tra le cose da prendere / {elemento} eliminato / Lista eliminata / Notifiche attivate / Non salvato, riprova |
 | Azione dei toast | Annulla |
