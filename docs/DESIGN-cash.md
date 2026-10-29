@@ -46,7 +46,7 @@ Il telefono parla solo con Caddy; il cookie sul dominio padre fa valere un login
 | Pezzo | Scelta |
 | --- | --- |
 | Domini | `shopping.skybreaker.dev` (Spesa) e `cash.skybreaker.dev` (Conti), ognuno con la sua build statica |
-| Reverse proxy | Caddy: HTTPS automatico, serve i file statici e passa `/api/*` (realtime compreso) a PocketBase su `127.0.0.1:8090`. Ogni app chiama le API sul proprio dominio: niente CORS |
+| Reverse proxy | Caddy: HTTPS automatico, serve i file statici e passa `/household/*` (realtime compreso) a PocketBase su `127.0.0.1:8090`, togliendo `/household`: le app chiamano `/household/api/…`, PocketBase riceve `/api/…`. Ogni app chiama le API sul proprio dominio: niente CORS |
 | Backend | Un binario Go con PocketBase e un database SQLite con le collezioni di tutte e due le app; non serve file statici |
 | Dashboard admin | `/_/` e le API dei superuser (per nome e per id della collezione) non esposte sui sottodomini delle app; PocketBase accetta i superuser solo da `127.0.0.1`, cioè dal tunnel SSH |
 | Login | Cookie HttpOnly sul dominio `.skybreaker.dev`, scritto e letto solo dal server (vedi sotto) |
@@ -56,7 +56,7 @@ Il telefono parla solo con Caddy; il cookie sul dominio padre fa valere un login
 
 ### Login condiviso
 
-- PocketBase autentica con un token nell'header `Authorization`. Il token vive solo in un cookie `pb_auth` HttpOnly, Secure, SameSite=Lax, con scadenza a 90 giorni, sul dominio `COOKIE_DOMAIN` e con path `/api/`: il JavaScript delle app non lo vede mai, e gli altri siti di skybreaker.dev non lo ricevono sulle loro pagine.
+- PocketBase autentica con un token nell'header `Authorization`. Il token vive solo in un cookie `pb_auth` HttpOnly, Secure, SameSite=Lax, con scadenza a 90 giorni, sul dominio `COOKIE_DOMAIN` e con path `/household/api/`: il JavaScript delle app non lo vede mai, e gli altri siti di skybreaker.dev non lo ricevono, né sulle loro pagine né sulle loro `/api/`. Fino al 2026-10-29 il path era `/api/`: login, rinnovo e uscita cancellano quel cookie, e all'apertura un'app rinnova una volta sul percorso vecchio per spostare la sessione sul nuovo, senza chiedere di nuovo il login.
 - Un middleware Go, che gira prima di quello con cui PocketBase legge il token, copia il cookie nell'header `Authorization` quando la richiesta non ne ha già uno e arriva dalla stessa origine: `Sec-Fetch-Site: same-origin`, oppure, senza quell'header, `Origin` uguale all'host. Per il browser tutti i sottodomini di skybreaker.dev sono lo stesso sito, quindi SameSite da solo non ferma una richiesta falsificata da un altro sottodominio.
 - Login e rinnovo (`auth-with-password` e `auth-refresh` della collezione `users`): un hook scrive il cookie con il token nuovo e lo toglie dalla risposta JSON, che porta solo il record dell'utente. Login, rinnovo e uscita dalla stessa origine soltanto: da un altro sito rispondono 403, così nessuno può mettere il proprio account nel cookie o far uscire l'utente.
 - All'avvio ogni app chiama `auth-refresh`: la risposta dà l'utente e rinnova il cookie; un 401 porta al login. Senza rete l'app usa l'ultimo utente salvato in localStorage (solo id, nome, nome utente e colore) e apre in sola lettura.
@@ -121,7 +121,7 @@ I nomi qui sotto sono quelli dell'interfaccia; usali anche nei commenti del codi
 | Trasferimento (transfer) | Soldi spostati tra buste: per l'avanzo di fine mese o per l'eliminazione di una busta |
 | Avanzo | A fine mese, per ogni busta di spesa, quello che resta va nella busta dell'avanzo (di default il Fondo emergenza). Se la busta è andata oltre, la differenza esce dalla busta dell'avanzo |
 | Fotografia del mese (month) | Quote, allocazioni e busta dell'avanzo di un mese. Ogni mese nuovo copia il precedente; cambiare la divisione tocca solo il mese in corso, i mesi passati restano com'erano |
-| Busta archiviata | Una busta eliminata: sparisce dal mese dell'eliminazione in poi ma resta nei mesi passati e nello storico |
+| Busta archiviata | Una busta eliminata: sparisce dal mese dell'eliminazione in poi ma resta nei mesi passati e nello storico. Una busta esiste dal suo primo mese, quello della prima allocazione: nei mesi prima non compare, e nella serie dei risparmi non ha valori |
 
 ## Modello dati e regole API
 
@@ -164,7 +164,7 @@ Cinque collezioni nuove, più il campo `app` su `push_subscriptions`; `users` è
 | amount | number intero, min 0 |  |
 | paid_on | text, pattern data | Vuoto finché non è segnata come versata |
 
-- List e view: autenticato. Update: autenticato, solo sul mese in corso o sui mesi aperti. `paid_on` si cambia solo sulla propria riga (`user = @request.auth.id`). Create e delete: bloccate.
+- List e view: autenticato. Update: autenticato; `amount` solo sui mesi aperti, `paid_on` anche sui mesi chiusi (una quota dimenticata entra negli entrati di quel mese, l'avanzo già spostato non cambia), e solo sulla propria riga (`user = @request.auth.id`). Create e delete: bloccate.
 
 ### month_allocations
 
@@ -222,8 +222,8 @@ Tutti i numeri si calcolano sul server con query aggregate, in un'unica route di
 | --- | --- |
 | GET /api/cash/summary?month= | Riepilogo del mese: quote, entrati, spesi, rimasti, in arrivo, buste con i loro numeri, avanzo previsto o effettivo, torta per busta del mese e dall'inizio, serie dei risparmi dall'inizio al mese in corso |
 | POST /api/cash/envelopes | Crea una busta `{ name, kind, amount, goal, opening_balance }` e la sua allocazione nel mese in corso, nello slot libero più basso. Rifiuta oltre 6 buste attive |
-| POST /api/cash/envelopes/{id}/archive | Archivia con `{ to }`: sposta allocazione e movimenti del mese in corso nella busta `to`, per le buste di risparmio crea un `transfer` con `reason = archive` del saldo restante, sposta la busta dell'avanzo se era questa, imposta `archived_from` al mese in corso. Tutto in una transazione |
-| POST /api/cash/envelopes/{id}/unarchive | Annulla un'archiviazione fatta oggi: serve per l'"Annulla" del toast |
+| POST /api/cash/envelopes/{id}/archive | Archivia con `{ to }`: sposta allocazione e movimenti del mese in corso nella busta `to`, crea un `transfer` con `reason = archive` di quello che resta nella busta (il saldo di una busta di risparmio, o un trasferimento ricevuto nel mese), sposta la busta dell'avanzo se era questa, imposta `archived_from` al mese in corso. Rifiuta l'ultima busta di risparmio attiva, perché l'avanzo ne ha bisogno. Tutto in una transazione |
+| POST /api/cash/envelopes/{id}/unarchive | Annulla un'archiviazione fatta oggi: serve per l'"Annulla" del toast. Rifiuta se nel frattempo la busta di destinazione è stata archiviata, la sua allocazione è scesa sotto quella ricevuta o la busta dell'avanzo è cambiata |
 
 Tutte richiedono un utente autenticato e rispondono con il riepilogo aggiornato del mese in corso, così il client non deve fare una seconda chiamata.
 
@@ -413,21 +413,25 @@ shopping.skybreaker.dev {
   handle /_/* {
     respond 404
   }
-  handle /api/collections/_superusers/* {
+  @superusers path /api/collections/_superusers/* /api/collections/pbc_3142635823/* /household/api/collections/_superusers/* /household/api/collections/pbc_3142635823/*
+  handle @superusers {
     respond 404
   }
-  handle /api/collections/pbc_3142635823/* {
-    respond 404
+  handle_path /household/* {
+    reverse_proxy 127.0.0.1:8090
   }
+  # Il percorso di prima, per il rinnovo che sposta il cookie da /api/.
   handle /api/* {
     reverse_proxy 127.0.0.1:8090
   }
   handle {
     root * /var/www/household/shopping
     encode zstd gzip
+    @pages path / */ *.html
+    header @pages Cache-Control no-cache
     header /sw.js Cache-Control no-cache
     header /manifest.webmanifest Content-Type application/manifest+json
-    try_files {path} {path}/index.html /index.html
+    try_files {path} {path}/index.html =404
     file_server
   }
 }
@@ -438,9 +442,9 @@ cash.skybreaker.dev {
 ```
 
 1. Il workflow Deploy guarda cosa è cambiato su `main` dall'ultimo deploy riuscito, così un deploy fallito riparte col push dopo: `backend/` porta a test e binario; `apps/shopping/` o `packages/shared/` alla build della Spesa; `apps/cash/` o `packages/shared/` alla build di Conti. Le build partono dopo il binario e non partono se il suo deploy è fallito.
-2. Ogni pezzo va sul server con la chiave di deploy, che può lanciare solo lo script di deploy. Il binario come oggi: SHA-256, copia del database, riavvio, binario precedente rimesso se `/api/health` non risponde. Una build come archivio tar con il suo SHA-256: scompattata in una cartella nuova, messa al posto della vecchia cambiando un link simbolico, senza riavvii.
+2. Ogni pezzo va sul server con la chiave di deploy, che può lanciare solo lo script di deploy: un deploy alla volta, caricamenti fino a 64 MB. Il binario come oggi: SHA-256, copia del database leggibile solo dal proprio utente, riavvio, binario precedente rimesso se `/api/health` non risponde. Una build come archivio tar con il suo SHA-256: scompattata in una cartella nuova, messa al posto della vecchia cambiando un link simbolico, senza riavvii.
 3. Sul server `/var/www/household/` contiene `backend/` (binario, `.env`, `pb_data`), `shopping/` e `cash/` (link simbolici alle build); il servizio systemd utente `household.service` ascolta su `127.0.0.1:8090`.
-4. Backup giornaliero cifrato del database su Google Drive, come oggi per la Spesa.
+4. Backup giornaliero cifrato del database su Google Drive, solo dopo il controllo d'integrità della copia, entro 15 minuti; se fallisce parte una mail con la fine del log, mandata con il server SMTP di Directus.
 5. La dashboard si apre con `ssh -L 8090:127.0.0.1:8090 portfolio` e poi `http://localhost:8090/_/`.
 
 ## Milestone e criteri di accettazione

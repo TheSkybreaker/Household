@@ -1,5 +1,10 @@
 # Changelog
 
+## Punti aperti delle milestone 1 e 2
+
+- The session cookie lives on /household/api/, which Caddy hands to PocketBase as /api/, so the other sites on skybreaker.dev no longer receive it; the old cookie on /api/ is moved with one refresh. COOKIE_DOMAIN is required outside development. A failed Esci keeps the Spesa notifications and says so in Conti; an app finding its session closed drops what it kept.
+- Conti: envelopes exist from their first month, a quota can be marked as paid after its month closed, the last savings envelope cannot be archived, an archive is undone only while nothing it moved has changed, impossible months and days are refused. Server: one deploy at a time with a size cap and a private predeploy.db, a backup checked for integrity with a mail when it fails, pages without stale cache and a 404 for missing files.
+
 ## Spesa: cose non prese
 
 - A new list can take over what is still to buy on the latest list up to today: one batch creates the list and the copies and marks the old items as taken, all or nothing. The Passate show only the last 30 days.
