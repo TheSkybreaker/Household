@@ -7,6 +7,9 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
+	// The binary carries the time zone database, so APP_TZ works on any host.
+	_ "time/tzdata"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/joho/godotenv"
@@ -23,7 +26,9 @@ type config struct {
 	vapidPrivateKey string
 	vapidSubject    string
 	cookieDomain    string
-	dev             bool
+	// location is APP_TZ, the zone of "today" and of the Conti month close.
+	location *time.Location
+	dev      bool
 }
 
 // loadConfig reads the environment, after loading the optional .env file used in development.
@@ -32,12 +37,21 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
+	var location *time.Location
+	if zone := os.Getenv("APP_TZ"); zone != "" {
+		var err error
+		if location, err = time.LoadLocation(zone); err != nil {
+			return config{}, fmt.Errorf("APP_TZ: %w", err)
+		}
+	}
+
 	return config{
 		vapidPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 		vapidPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
 		// webpush-go adds "mailto:" to anything that is not an https URL.
 		vapidSubject: strings.TrimPrefix(os.Getenv("VAPID_SUBJECT"), "mailto:"),
 		cookieDomain: os.Getenv("COOKIE_DOMAIN"),
+		location:     location,
 		dev:          os.Getenv("DEV") == "1",
 	}, nil
 }
@@ -52,6 +66,9 @@ func (c config) missingVariables() []string {
 		if variable.value == "" {
 			missing = append(missing, variable.name)
 		}
+	}
+	if c.location == nil {
+		missing = append(missing, "APP_TZ")
 	}
 	return missing
 }
@@ -91,6 +108,7 @@ func main() {
 
 	registerCookieAuth(app, cfg)
 	registerPush(app, cfg, webpush.SendNotification)
+	registerCash(app, cfg, time.Now)
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)

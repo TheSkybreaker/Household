@@ -28,6 +28,13 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
+	return newFixtureWith(t, nil)
+}
+
+// newFixtureWith also runs seed on the fixture data dir, so the records it adds keep the same ids
+// in the copy each scenario gets.
+func newFixtureWith(t *testing.T, seed func(testing.TB, core.App, *fixture)) *fixture {
+	t.Helper()
 
 	// An empty data dir means only the system migrations and ours are applied.
 	app, err := tests.NewTestApp(t.TempDir())
@@ -95,6 +102,9 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 
+	if seed != nil {
+		seed(t, app, f)
+	}
 	return f
 }
 

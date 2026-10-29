@@ -63,6 +63,7 @@ func testConfig(dev bool) config {
 		vapidPublicKey:  security.RandomString(20),
 		vapidPrivateKey: security.RandomString(20),
 		vapidSubject:    "test@example.com",
+		location:        rome,
 		dev:             dev,
 	}
 }
