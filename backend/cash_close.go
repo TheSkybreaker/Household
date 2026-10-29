@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/pocketbase/dbx"
@@ -48,6 +50,17 @@ func (c *cashBook) syncMonths() error {
 		}
 	}
 	return nil
+}
+
+// ensureCurrentMonth runs syncMonths when the current month does not exist yet: between midnight and
+// the nightly job, or when that job failed. Call it outside a transaction.
+func (c *cashBook) ensureCurrentMonth() error {
+	if _, err := c.app.FindFirstRecordByData("months", "month", c.currentMonth()); err == nil {
+		return nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	return c.syncMonths()
 }
 
 // openMonths creates each missing month up to current as a copy of the one before: quotas still to

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -175,5 +176,22 @@ func TestClosedMonthEditKeepsTheSweep(t *testing.T) {
 	}
 	if balance := value(envelopeNamed(t, s, "Fondo emergenza").Balance); balance != 269710 {
 		t.Errorf("Fondo balance = %v, want 269710", balance)
+	}
+}
+
+func TestTheNewMonthOpensOnFirstUse(t *testing.T) {
+	f := newFixtureWith(t, func(t testing.TB, app core.App, f *fixture) { seedCash(t, app, f, octoberCurrent) })
+	// 00:05 of November 1st in Rome: the nightly job has not run yet.
+	app, book := cashApp(t, f, time.Date(2026, 11, 1, 0, 5, 0, 0, rome))
+
+	s := summaryOf(t, book, app, "")
+	if s.Month != "2026-11" || len(s.Quotas) != 2 || len(s.Envelopes) != 5 || s.Envelopes[0].Allocated != 105000 {
+		t.Errorf("November before the nightly job: month %s, %d quotas, envelopes %+v", s.Month, len(s.Quotas), s.Envelopes)
+	}
+	if !summaryOf(t, book, app, "2026-10").Closed {
+		t.Error("October is still open")
+	}
+	if err := book.createEnvelope(app, f.userA.Id, envelopeInput{Name: "Regali", Kind: "spend"}); err != nil {
+		t.Errorf("creating an envelope: %v", err)
 	}
 }

@@ -58,6 +58,9 @@ func (c *cashBook) createEnvelope(app core.App, by string, in envelopeInput) err
 	if len(errs) > 0 {
 		return errs
 	}
+	if err := c.ensureCurrentMonth(); err != nil {
+		return err
+	}
 
 	return app.RunInTransaction(func(tx core.App) error {
 		active, err := tx.FindAllRecords("envelopes", dbx.HashExp{"archived_from": ""})
@@ -106,6 +109,9 @@ func (c *cashBook) createEnvelope(app core.App, by string, in envelopeInput) err
 // movements go to the envelope to, a savings envelope also hands over its balance, and the avanzo
 // moves if it went here. The past months keep it as it was.
 func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
+	if err := c.ensureCurrentMonth(); err != nil {
+		return err
+	}
 	return app.RunInTransaction(func(tx core.App) error {
 		envelope, err := tx.FindRecordById("envelopes", id)
 		if err != nil {
@@ -212,6 +218,9 @@ func (c *cashBook) nextSweepTo(tx core.App, target *core.Record, archived string
 // unarchiveEnvelope puts back what archiving moved, on the day it happened, as long as no other
 // envelope took its colour.
 func (c *cashBook) unarchiveEnvelope(app core.App, id string) error {
+	if err := c.ensureCurrentMonth(); err != nil {
+		return err
+	}
 	return app.RunInTransaction(func(tx core.App) error {
 		envelope, err := tx.FindRecordById("envelopes", id)
 		if err != nil {

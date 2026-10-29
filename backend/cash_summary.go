@@ -373,6 +373,9 @@ var (
 
 // summaryOf builds the summary of month, the current one when empty.
 func (c *cashBook) summaryOf(app core.App, month string) (cashSummary, error) {
+	if err := c.ensureCurrentMonth(); err != nil {
+		return cashSummary{}, err
+	}
 	current := c.currentMonth()
 	if month == "" {
 		month = current
