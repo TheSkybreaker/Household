@@ -35,6 +35,10 @@ func TestMovementValidation(t *testing.T) {
 			Body:           strings.NewReader(`{"kind":"spend","amount":1200,"date":"2026-10-14","user":"` + f.userA.Id + `","created_by":"` + f.userA.Id + `"}`),
 			ExpectedStatus: 400, ExpectedContent: []string{`"envelope":{`}},
 		{Name: "spend of tomorrow", Method: http.MethodPost, URL: movements, Headers: f.authA(), Body: spend("2026-10-16", "casa"), ExpectedStatus: 400, ExpectedContent: []string{`"date":{`}},
+		{Name: "spend on a day that does not exist", Method: http.MethodPost, URL: movements, Headers: f.authA(),
+			Body: strings.NewReader(`{"kind":"spend","amount":1200,"date":"2026-09-31","month":"2026-10","envelope":"` + seed.envelopes["casa"].Id +
+				`","user":"` + f.userA.Id + `","created_by":"` + f.userA.Id + `"}`),
+			ExpectedStatus: 400, ExpectedContent: []string{`"date":{`}},
 		{Name: "spend before the first month", Method: http.MethodPost, URL: movements, Headers: f.authA(), Body: spend("2026-08-31", "casa"), ExpectedStatus: 400, ExpectedContent: []string{`"date":{`}},
 		{Name: "extra without whose money it is", Method: http.MethodPost, URL: movements, Headers: f.authA(),
 			Body:           strings.NewReader(`{"kind":"extra","amount":1200,"date":"2026-10-14","envelope":"` + seed.envelopes["fondo"].Id + `","created_by":"` + f.userA.Id + `"}`),

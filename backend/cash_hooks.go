@@ -24,14 +24,17 @@ func (c *cashBook) registerHooks() {
 	c.app.OnRecordUpdateRequest("month_quotas").BindFunc(c.checkQuotaUpdate)
 }
 
-// checkMovement derives month from date and validates the fields of each kind. A malformed date is
-// left to the field validation.
+// checkMovement derives month from date, never from the request, and validates the fields of each
+// kind.
 func (c *cashBook) checkMovement(e *core.RecordEvent) error {
 	movement := e.Record
 	date := movement.GetString("date")
 	errs := validation.Errors{}
 
-	if _, err := time.Parse(time.DateOnly, date); err == nil {
+	movement.Set("month", "")
+	if _, err := time.Parse(time.DateOnly, date); err != nil {
+		errs["date"] = validation.NewError("validation_invalid_date", "Not a calendar day.")
+	} else {
 		month := date[:7]
 		movement.Set("month", month)
 		first, err := c.firstMonth(e.App)
