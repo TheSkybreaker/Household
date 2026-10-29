@@ -1,6 +1,7 @@
 import Alpine from 'alpinejs';
 import { pb, type User } from '@household/shared/pb';
 import { cachedUser } from '@household/shared/session';
+import { registerToast } from '@household/shared/toast';
 
 export interface SessionStore {
   me: User | null;
@@ -27,6 +28,7 @@ function sessionStore(): SessionStore {
 
 export function registerStores() {
   Alpine.store('session', sessionStore());
+  registerToast();
 
   pb.authStore.onChange(() => {
     session().me = (pb.authStore.record as User | null) ?? cachedUser();

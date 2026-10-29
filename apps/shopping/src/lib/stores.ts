@@ -1,11 +1,11 @@
 import Alpine from 'alpinejs';
 import { cachedUser } from '@household/shared/session';
+import { registerToast } from '@household/shared/toast';
 import { pb, type Item, type List, type User } from './pb';
 import { isPendingDeletion } from './pending';
 import { initialNotificationState, type NotificationState } from './push';
 
 const FRESH_MS = 1500;
-const TOAST_MS = 2800;
 
 export interface SessionStore {
   me: User | null;
@@ -34,25 +34,12 @@ export interface ItemsStore extends RecordStore<Item> {
   markFresh(id: string): void;
 }
 
-export interface ToastAction {
-  label: string;
-  run: () => void;
-}
-
-export interface ToastStore {
-  message: string;
-  actionLabel: string;
-  visible: boolean;
-  // durationMs null keeps the toast until it is tapped or replaced.
-  show(message: string, action?: ToastAction, durationMs?: number | null): void;
-  act(): void;
-  hide(): void;
-}
+// The toast is shared with Conti; the Spesa modules keep importing it from here.
+export { toast } from '@household/shared/toast';
 
 export const session = () => Alpine.store('session') as SessionStore;
 export const lists = () => Alpine.store('lists') as RecordStore<List>;
 export const items = () => Alpine.store('items') as ItemsStore;
-export const toast = () => Alpine.store('toast') as ToastStore;
 
 // Records hidden by a deletion that is still waiting for its undo window are never re-added,
 // whether by a reload or by a realtime event.
@@ -114,39 +101,11 @@ function itemsStore(): ItemsStore {
   return store;
 }
 
-function toastStore(): ToastStore {
-  let action: ToastAction | undefined;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  return {
-    message: '',
-    actionLabel: '',
-    visible: false,
-    show(message, nextAction, durationMs = TOAST_MS) {
-      action = nextAction;
-      this.message = message;
-      this.actionLabel = nextAction?.label ?? '';
-      this.visible = true;
-      clearTimeout(timer);
-      if (durationMs !== null) timer = setTimeout(() => this.hide(), durationMs);
-    },
-    act() {
-      const run = action?.run;
-      this.hide();
-      run?.();
-    },
-    hide() {
-      action = undefined;
-      this.visible = false;
-    },
-  };
-}
-
 export function registerStores() {
   Alpine.store('session', sessionStore());
   Alpine.store('lists', recordStore<List>());
   Alpine.store('items', itemsStore());
-  Alpine.store('toast', toastStore());
+  registerToast();
 
   pb.authStore.onChange(() => {
     session().me = (pb.authStore.record as User | null) ?? cachedUser();
