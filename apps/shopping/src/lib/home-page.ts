@@ -3,7 +3,7 @@ import { isRedirecting, logout } from './auth';
 import { restoreHome, saveHome } from './cache';
 import { fromIsoDate, quickDays, shortDateLabel, toIsoDate, weekdayShort } from './dates';
 import { resumeDeletions } from './deletions';
-import { contributors, homeSummary, listProgress, rowStatus, splitLists } from './groups';
+import { carryOver, carryOverLabel, contributors, homeSummary, listProgress, rowStatus, splitLists } from './groups';
 import { goTo, listUrl, takeFlash } from './nav';
 import { installApp } from './pwa';
 import { disableNotifications, enableNotifications, sendTestPush } from './push';
@@ -19,6 +19,8 @@ export function homePage() {
     days: quickDays(),
     newListDate: toIsoDate(new Date()),
     newListTitle: '',
+    // Whether the new list takes over what is still to buy on the latest one.
+    carry: true,
     creating: false,
     nameDraft: '',
 
@@ -61,6 +63,15 @@ export function homePage() {
       return homeSummary(this.groups.upcoming, items().all);
     },
 
+    get carryOffer() {
+      return carryOver(lists().all, items().all);
+    },
+
+    get carryLabel() {
+      const offer = this.carryOffer;
+      return offer ? carryOverLabel(offer.items.length, offer.list.date) : '';
+    },
+
     get partnerName() {
       return session().partner?.name ?? '';
     },
@@ -89,6 +100,7 @@ export function homePage() {
       this.days = quickDays();
       this.newListDate = this.days[0].date;
       this.newListTitle = '';
+      this.carry = true;
       this.sheet = 'newList';
     },
 
@@ -100,7 +112,8 @@ export function homePage() {
     async submitNewList() {
       if (this.creating) return;
       this.creating = true;
-      const id = await createList(this.newListDate || toIsoDate(new Date()), this.newListTitle);
+      const carried = this.carry ? (this.carryOffer?.items ?? []) : [];
+      const id = await createList(this.newListDate || toIsoDate(new Date()), this.newListTitle, carried);
       if (id) goTo(`${listUrl(id)}&nuova=1`);
       else this.creating = false;
     },

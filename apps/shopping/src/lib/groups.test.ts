@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contributors, homeSummary, listProgress, progressLabel, rowStatus, splitItems, splitLists, suggestions } from './groups';
+import { carryOver, contributors, homeSummary, listProgress, progressLabel, rowStatus, splitItems, splitLists, suggestions } from './groups';
 import type { Item, List } from './pb';
 
 const now = new Date(2026, 9, 1, 12);
@@ -21,6 +21,51 @@ describe('splitLists', () => {
     );
     expect(upcoming.map((l) => l.id)).toEqual(['b', 'a']);
     expect(past.map((l) => l.id)).toEqual(['d', 'c']);
+  });
+
+  it('leaves out the lists older than 30 days', () => {
+    const { past } = splitLists([list('kept', '2026-09-01'), list('hidden', '2026-08-31')], now);
+    expect(past.map((l) => l.id)).toEqual(['kept']);
+  });
+});
+
+describe('carryOver', () => {
+  it('offers what is still to buy on the latest list up to today, in the order it was added', () => {
+    const offer = carryOver(
+      [list('older', '2026-09-20'), list('latest', '2026-09-28'), list('future', '2026-10-03')],
+      [
+        item('milk', { list: 'latest', created: '2026-09-28 10:00:00.000Z' }),
+        item('bread', { list: 'latest', created: '2026-09-28 09:00:00.000Z' }),
+        item('taken', { list: 'latest', checked: true, checked_at: '2026-09-28 11:00:00.000Z' }),
+        item('eggs', { list: 'older' }),
+        item('wine', { list: 'future' }),
+      ],
+      now,
+    );
+    expect(offer?.list.id).toBe('latest');
+    expect(offer?.items.map((i) => i.id)).toEqual(['bread', 'milk']);
+  });
+
+  it('offers nothing when the latest list has nothing left, even if an older one has', () => {
+    const offer = carryOver(
+      [list('older', '2026-09-20'), list('latest', '2026-09-28')],
+      [item('taken', { list: 'latest', checked: true }), item('eggs', { list: 'older' })],
+      now,
+    );
+    expect(offer).toBeNull();
+  });
+
+  it('counts a list of today, and the one created last among lists of the same day', () => {
+    const offer = carryOver(
+      [list('morning', '2026-10-01', '2026-10-01 07:00:00.000Z'), list('noon', '2026-10-01', '2026-10-01 11:00:00.000Z')],
+      [item('eggs', { list: 'morning' }), item('milk', { list: 'noon' })],
+      now,
+    );
+    expect(offer?.list.id).toBe('noon');
+  });
+
+  it('never offers a list older than 30 days', () => {
+    expect(carryOver([list('hidden', '2026-08-31')], [item('eggs', { list: 'hidden' })], now)).toBeNull();
   });
 });
 

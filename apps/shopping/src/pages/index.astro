@@ -88,6 +88,10 @@ import Toast from '../components/Toast.astro';
           <span>Nome <small>facoltativo</small></span>
           <input x-model="newListTitle" placeholder="Es. Esselunga, cena di venerdì" maxlength="40" />
         </label>
+        <div class="setting" x-show="carryOffer">
+          <span x-text="carryLabel"></span>
+          <button type="button" class="switch" role="switch" :aria-label="carryLabel" :aria-checked="carry" @click="carry = !carry"><i></i></button>
+        </div>
         <button type="submit" class="btn primary wide" :disabled="creating || !$store.session.online">Crea lista</button>
       </form>
     </Sheet>

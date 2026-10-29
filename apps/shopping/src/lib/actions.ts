@@ -143,10 +143,25 @@ export function deleteList(list: List) {
 }
 
 // Not optimistic: the list page loads the record, so it must exist before opening it.
-export async function createList(date: string, title: string): Promise<string | null> {
+// The batch limit of the backend fits the list and 100 carried items.
+const MAX_CARRIED = 100;
+
+// A new list, with a copy of each carried item, which is marked as taken on its old list. One batch:
+// the new list never exists without them, and nothing is taken unless the copies are saved.
+export async function createList(date: string, title: string, carried: Item[] = []): Promise<string | null> {
   const id = newRecordId();
+  const me = meId();
+  const batch = pb.createBatch();
+  batch.collection('lists').create({ id, date, title: capitalize(title.trim()) || 'Spesa', created_by: me });
+  const start = Date.now();
+  carried.slice(0, MAX_CARRIED).forEach((item, index) => {
+    // One millisecond apart, so the copies keep their order among the items to buy.
+    const at = new Date(start + index).toISOString();
+    batch.collection('items').create({ id: newRecordId(), list: id, name: item.name, qty: item.qty, added_by: me, added_at: at });
+    batch.collection('items').update(item.id, { checked: true, checked_by: me, checked_at: at });
+  });
   try {
-    await pb.collection('lists').create({ id, date, title: capitalize(title.trim()) || 'Spesa', created_by: meId() });
+    await batch.send();
     return id;
   } catch {
     toast().show('Non salvato, riprova');
