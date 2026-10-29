@@ -1,4 +1,4 @@
-import { ClientResponseError } from 'pocketbase';
+import PocketBase, { BaseAuthStore, ClientResponseError } from 'pocketbase';
 import { pb, type User } from './pb';
 
 export type SessionState = 'signed-in' | 'signed-out' | 'offline';
@@ -51,9 +51,27 @@ function legacyToken(): string {
 
 const isRejected = (error: unknown) => error instanceof ClientResponseError && [401, 403, 404].includes(error.status);
 
+// Until 2026-10-29 the API was under /api/ and so was the cookie. A refresh there sends the old
+// cookie, and the server answers with the new one and deletes the old.
+const oldPathApi = new PocketBase('/', new BaseAuthStore());
+
+async function moveOldPathCookie(): Promise<boolean> {
+  try {
+    await oldPathApi.collection('users').authRefresh();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Renews the cookie and reads the signed-in user, from the cookie or, once, from the token the
-// Spesa used to keep in localStorage. A network error keeps the cached user.
-export async function refreshSession(): Promise<SessionState> {
+// Spesa used to keep in localStorage or the cookie on the old path. A network error keeps the
+// cached user.
+export function refreshSession(): Promise<SessionState> {
+  return refresh(true);
+}
+
+async function refresh(canMoveOldCookie: boolean): Promise<SessionState> {
   const legacy = legacyToken();
   try {
     const { record } = await pb.collection('users').authRefresh<User>(legacy ? { headers: { Authorization: legacy } } : {});
@@ -65,8 +83,9 @@ export async function refreshSession(): Promise<SessionState> {
     if (legacy) {
       // An expired old token: the cookie may still hold a session.
       writeStorage(LEGACY_AUTH_KEY, null);
-      return refreshSession();
+      return refresh(canMoveOldCookie);
     }
+    if (canMoveOldCookie && (await moveOldPathCookie())) return refresh(false);
     rememberUser(null);
     return 'signed-out';
   }

@@ -9,7 +9,9 @@ export interface User {
 
 // The auth token lives in an HttpOnly cookie that only the server reads, so the client keeps no
 // token: the SDK sends no Authorization header and its store holds just the user, in memory.
-export const pb = new PocketBase('/', new BaseAuthStore());
+// The API is under /household/api/, which Caddy hands to PocketBase as /api/: the cookie is kept
+// to that path, which the other sites on the domain do not have.
+export const pb = new PocketBase('/household', new BaseAuthStore());
 
 // Auto cancellation drops a request when another one with the same path starts, which would
 // silently skip a reload or a quick second update of the same record.

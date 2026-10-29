@@ -19,6 +19,8 @@ const record = { id: 'u1', collectionId: '_pb_users_auth_', collectionName: 'use
 const publicUser = { id: 'u1', name: 'Vittorio', username: 'vittorio', color: 'sky' };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const authorization = (call: number) => (fetchMock.mock.calls[call][1] as RequestInit & { headers: Record<string, string> }).headers.Authorization;
+const url = (call: number) => String(fetchMock.mock.calls[call][0]);
+const rejected = () => json(401, { status: 401, message: 'no', data: {} });
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -36,11 +38,12 @@ describe('refreshSession', () => {
     expect(await refreshSession()).toBe('signed-in');
     expect(cachedUser()).toEqual(publicUser);
     expect(authorization(0)).toBeUndefined();
+    expect(url(0)).toContain('/household/api/collections/users/auth-refresh');
   });
 
-  it('signs out and forgets the user when the cookie is rejected', async () => {
+  it('signs out and forgets the user when the cookie is rejected on both paths', async () => {
     localStorage.setItem('household:user', JSON.stringify(publicUser));
-    fetchMock.mockResolvedValueOnce(json(401, { status: 401, message: 'no', data: {} }));
+    fetchMock.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(rejected());
     expect(await refreshSession()).toBe('signed-out');
     expect(cachedUser()).toBeNull();
   });
@@ -50,6 +53,14 @@ describe('refreshSession', () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     expect(await refreshSession()).toBe('offline');
     expect(cachedUser()).toEqual(publicUser);
+  });
+
+  it('moves the session of the cookie on the old /api/ path, once', async () => {
+    fetchMock.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(json(200, { token: '', record })).mockResolvedValueOnce(json(200, { token: '', record }));
+    expect(await refreshSession()).toBe('signed-in');
+    expect(url(1)).toMatch(/^(https?:\/\/[^/]+)?\/api\/collections\/users\/auth-refresh/);
+    expect(url(2)).toContain('/household/api/collections/users/auth-refresh');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('exchanges the token of the old localStorage session once', async () => {

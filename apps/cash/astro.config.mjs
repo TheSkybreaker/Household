@@ -8,8 +8,12 @@ export default defineConfig({
   server: { port: 4322 },
   vite: {
     server: {
-      // The client always talks to its own origin: in development Astro forwards the API to PocketBase.
-      proxy: { '/api': 'http://127.0.0.1:8090' },
+      // The client always talks to its own origin: in development Astro forwards the API to PocketBase,
+      // under /household/api/ like Caddy, and the old /api/ path that moves the cookie of before.
+      proxy: {
+        '/household': { target: 'http://127.0.0.1:8090', rewrite: (path) => path.replace(/^\/household/, '') },
+        '/api': 'http://127.0.0.1:8090',
+      },
     },
   },
 });
