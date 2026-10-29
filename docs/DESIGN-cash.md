@@ -416,6 +416,9 @@ shopping.skybreaker.dev {
   handle /api/collections/_superusers/* {
     respond 404
   }
+  handle /api/collections/pbc_3142635823/* {
+    respond 404
+  }
   handle /api/* {
     reverse_proxy 127.0.0.1:8090
   }
@@ -423,6 +426,7 @@ shopping.skybreaker.dev {
     root * /var/www/household/shopping
     encode zstd gzip
     header /sw.js Cache-Control no-cache
+    header /manifest.webmanifest Content-Type application/manifest+json
     try_files {path} {path}/index.html /index.html
     file_server
   }
