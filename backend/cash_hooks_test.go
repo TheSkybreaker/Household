@@ -97,6 +97,7 @@ func TestCashUpdates(t *testing.T) {
 	f.cashScenarios(t, demoClock, []tests.ApiScenario{
 		{Name: "avanzo to a savings envelope", Method: http.MethodPatch, URL: record("months", seed.months["2026-10"]), Headers: f.authA(), Body: sweepTo("vacanze"), ExpectedStatus: 200, ExpectedContent: []string{`"sweep_to":"` + seed.envelopes["vacanze"].Id}},
 		{Name: "avanzo to a spend envelope", Method: http.MethodPatch, URL: record("months", seed.months["2026-10"]), Headers: f.authA(), Body: sweepTo("casa"), ExpectedStatus: 400, ExpectedContent: []string{`"sweep_to":{`}},
+		{Name: "avanzo to nowhere", Method: http.MethodPatch, URL: record("months", seed.months["2026-10"]), Headers: f.authA(), Body: body(`{"sweep_to":""}`), ExpectedStatus: 400, ExpectedContent: []string{`"sweep_to":{`}},
 		{Name: "avanzo of a past month", Method: http.MethodPatch, URL: record("months", seed.months["2026-09"]), Headers: f.authA(), Body: sweepTo("vacanze"), ExpectedStatus: 400, ExpectedContent: []string{`"month":{`}},
 		{Name: "allocation of this month", Method: http.MethodPatch, URL: record("month_allocations", seed.allocations["2026-10/casa"]), Headers: f.authA(), Body: body(`{"amount":110000}`), ExpectedStatus: 200, ExpectedContent: []string{`"amount":110000`}},
 		{Name: "allocation of a past month", Method: http.MethodPatch, URL: record("month_allocations", seed.allocations["2026-09/casa"]), Headers: f.authA(), Body: body(`{"amount":110000}`), ExpectedStatus: 400, ExpectedContent: []string{`"month":{`}},

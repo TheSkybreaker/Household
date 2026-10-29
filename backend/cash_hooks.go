@@ -109,12 +109,16 @@ func checkEnvelope(e *core.RecordEvent) error {
 }
 
 // checkMonthUpdate lets only the current month change, and its avanzo go to an active savings
-// envelope.
+// envelope; once it has one, it cannot go back to none.
 func (c *cashBook) checkMonthUpdate(e *core.RecordRequestEvent) error {
 	if e.Record.Original().GetString("month") != c.currentMonth() {
 		return e.BadRequestError("Only the current month can change.", validation.Errors{"month": errNotCurrent})
 	}
-	if sweepTo := e.Record.GetString("sweep_to"); sweepTo != "" {
+	sweepTo := e.Record.GetString("sweep_to")
+	if sweepTo == "" && e.Record.Original().GetString("sweep_to") != "" {
+		return e.BadRequestError("The avanzo needs an envelope.", validation.Errors{"sweep_to": errRequired})
+	}
+	if sweepTo != "" {
 		envelope, err := e.App.FindRecordById("envelopes", sweepTo)
 		if err == nil && (envelope.GetString("kind") != "save" || envelope.GetString("archived_from") != "") {
 			return e.BadRequestError("The avanzo goes to an active savings envelope.", validation.Errors{

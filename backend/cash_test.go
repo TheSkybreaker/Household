@@ -182,6 +182,18 @@ func TestCashRules(t *testing.T) {
 		{Name: "user lists movements", Method: http.MethodGet, URL: records("movements"), Headers: f.authA(), ExpectedStatus: 200, ExpectedContent: []string{`"totalItems":13`}},
 		{Name: "user renames an envelope", Method: http.MethodPatch, URL: record("envelopes", seed.envelopes["casa"]), Headers: f.authA(), Body: body(`{"name":"Casa e bollette","note":"Affitto"}`), ExpectedStatus: 200, ExpectedContent: []string{`"name":"Casa e bollette"`}},
 		{Name: "user changes an envelope kind", Method: http.MethodPatch, URL: record("envelopes", seed.envelopes["casa"]), Headers: f.authA(), Body: body(`{"kind":"save"}`), ExpectedStatus: 404, ExpectedContent: []string{`"data":{}`}},
+		// PocketBase drops hidden fields from the body of anyone but a superuser.
+		{Name: "user writes the undo of an archive", Method: http.MethodPatch, URL: record("envelopes", seed.envelopes["casa"]), Headers: f.authA(), Body: body(`{"archive_undo":{"date":"2026-10-15"}}`),
+			ExpectedStatus: 200, ExpectedContent: []string{`"name":"Casa"`},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				casa, err := app.FindRecordById("envelopes", seed.envelopes["casa"].Id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if undo := casa.GetString("archive_undo"); undo != "" && undo != "null" {
+					t.Errorf("archive_undo written through the API: %s", undo)
+				}
+			}},
 		{Name: "user changes an envelope slot", Method: http.MethodPatch, URL: record("envelopes", seed.envelopes["casa"]), Headers: f.authA(), Body: body(`{"slot":6}`), ExpectedStatus: 404, ExpectedContent: []string{`"data":{}`}},
 		{Name: "user writes a transfer", Method: http.MethodPost, URL: records("movements"), Headers: f.authA(),
 			Body:           body(`{"kind":"transfer","reason":"sweep","amount":100,"date":"2026-10-14","from_envelope":"` + seed.envelopes["casa"].Id + `","to_envelope":"` + seed.envelopes["fondo"].Id + `","created_by":"` + f.userA.Id + `"}`),
