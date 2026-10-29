@@ -20,6 +20,34 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') void self.skipWaiting();
 });
 
+// The Spesa from before the shared login cannot keep the cookie session, so it ends on its login
+// page, which has no update toast. The first worker of this generation therefore replaces it at
+// once and reloads its pages; the marker cache makes every later update wait for Aggiorna again.
+const GENERATION_CACHE = 'household-generation-1';
+let replacingOldGeneration = false;
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      if (!self.registration.active || (await caches.has(GENERATION_CACHE))) return;
+      replacingOldGeneration = true;
+      await self.skipWaiting();
+    })(),
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      await caches.open(GENERATION_CACHE);
+      if (!replacingOldGeneration) return;
+      await self.clients.claim();
+      const windows = await self.clients.matchAll({ type: 'window' });
+      await Promise.all(windows.map((window) => (window as WindowClient).navigate(window.url)));
+    })(),
+  );
+});
+
 self.addEventListener('push', (event) => {
   const payload = event.data?.json() as PushPayload | undefined;
   if (payload) event.waitUntil(showItemAdded(payload));
