@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -18,7 +19,18 @@ type cashBook struct {
 func registerCash(app core.App, cfg config, now func() time.Time) *cashBook {
 	c := &cashBook{app: app, loc: cfg.location, now: now}
 	c.registerHooks()
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		c.registerRoutes(se)
+		return se.Next()
+	})
 	return c
+}
+
+// registerRoutes binds /api/cash/*: every route needs a signed-in user.
+func (c *cashBook) registerRoutes(se *core.ServeEvent) {
+	group := se.Router.Group("/api/cash")
+	group.Bind(apis.RequireAuth("users"))
+	group.GET("/summary", c.handleSummary)
 }
 
 // today is the calendar day in the app time zone, as YYYY-MM-DD.
