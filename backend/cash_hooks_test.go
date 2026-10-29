@@ -101,6 +101,7 @@ func TestCashUpdates(t *testing.T) {
 		{Name: "avanzo of a past month", Method: http.MethodPatch, URL: record("months", seed.months["2026-09"]), Headers: f.authA(), Body: sweepTo("vacanze"), ExpectedStatus: 400, ExpectedContent: []string{`"month":{`}},
 		{Name: "allocation of this month", Method: http.MethodPatch, URL: record("month_allocations", seed.allocations["2026-10/casa"]), Headers: f.authA(), Body: body(`{"amount":110000}`), ExpectedStatus: 200, ExpectedContent: []string{`"amount":110000`}},
 		{Name: "allocation of a past month", Method: http.MethodPatch, URL: record("month_allocations", seed.allocations["2026-09/casa"]), Headers: f.authA(), Body: body(`{"amount":110000}`), ExpectedStatus: 400, ExpectedContent: []string{`"month":{`}},
+		{Name: "quota paid on a day that does not exist", Method: http.MethodPatch, URL: record("month_quotas", seed.quotas["2026-10/usera"]), Headers: f.authA(), Body: body(`{"paid_on":"2026-09-31"}`), ExpectedStatus: 400, ExpectedContent: []string{`"paid_on":{`}},
 		{Name: "quota paid tomorrow", Method: http.MethodPatch, URL: record("month_quotas", seed.quotas["2026-10/usera"]), Headers: f.authA(), Body: body(`{"paid_on":"2026-10-16"}`), ExpectedStatus: 400, ExpectedContent: []string{`"paid_on":{`}},
 		{Name: "goal on a spend envelope", Method: http.MethodPatch, URL: record("envelopes", seed.envelopes["casa"]), Headers: f.authA(), Body: body(`{"goal":1000}`), ExpectedStatus: 400, ExpectedContent: []string{`"goal":{`}},
 	})

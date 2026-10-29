@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"slices"
 	"testing"
@@ -126,7 +127,9 @@ func TestCashSummary(t *testing.T) {
 		}
 		series := map[string][]int{}
 		for _, line := range s.Savings.Series {
-			series[line.Envelope] = line.Balances
+			for _, balance := range line.Balances {
+				series[line.Envelope] = append(series[line.Envelope], value(balance).(int))
+			}
 		}
 		if got, want := series[seed.envelopes["fondo"].Id], []int{269710, 339710}; !slices.Equal(got, want) {
 			t.Errorf("Fondo series = %v, want %v", got, want)
@@ -193,5 +196,37 @@ func TestTheNewMonthOpensOnFirstUse(t *testing.T) {
 	}
 	if err := book.createEnvelope(app, f.userA.Id, envelopeInput{Name: "Regali", Kind: "spend"}); err != nil {
 		t.Errorf("creating an envelope: %v", err)
+	}
+}
+
+func TestEnvelopesStartInTheirMonth(t *testing.T) {
+	f := newFixtureWith(t, func(t testing.TB, app core.App, f *fixture) { seedCash(t, app, f, octoberCurrent) })
+	app, book := cashApp(t, f, demoClock)
+	mustCreate(t, book, app, f.userA.Id, envelopeInput{Name: "Auto", Kind: "save", Amount: 3000, OpeningBalance: 120000})
+
+	if hasEnvelope(summaryOf(t, book, app, "2026-09"), "Auto") {
+		t.Error("Auto, created in October, shows in September")
+	}
+	october := summaryOf(t, book, app, "2026-10")
+	if !hasEnvelope(october, "Auto") {
+		t.Fatal("Auto is missing from October")
+	}
+	for _, line := range october.Savings.Series {
+		if line.Envelope != envelopeNamed(t, october, "Auto").ID {
+			continue
+		}
+		if len(line.Balances) != 2 || line.Balances[0] != nil || line.Balances[1] == nil || *line.Balances[1] != 123000 {
+			t.Errorf("Auto savings series = %v, want nothing in September and 123000 in October", line.Balances)
+		}
+	}
+}
+
+// Between 2026-09 and 2027-01 as text, 2026-13 passes a string comparison with the bounds.
+func TestImpossibleMonthIsRefused(t *testing.T) {
+	f := newFixtureWith(t, func(t testing.TB, app core.App, f *fixture) { seedCash(t, app, f, octoberCurrent) })
+	app, book := cashApp(t, f, time.Date(2027, 1, 5, 10, 0, 0, 0, rome))
+
+	if _, err := book.summaryOf(app, "2026-13"); !errors.Is(err, errMonthOutOfBounds) {
+		t.Errorf("summary of 2026-13: %v, want errMonthOutOfBounds", err)
 	}
 }

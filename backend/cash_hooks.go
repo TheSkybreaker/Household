@@ -142,9 +142,15 @@ func (c *cashBook) checkAllocationUpdate(e *core.RecordRequestEvent) error {
 	return e.Next()
 }
 
-// checkQuotaUpdate refuses a quota paid on a day still to come.
+// checkQuotaUpdate refuses a quota paid on a day that does not exist or is still to come.
 func (c *cashBook) checkQuotaUpdate(e *core.RecordRequestEvent) error {
-	if paidOn := e.Record.GetString("paid_on"); paidOn > c.today() {
+	paidOn := e.Record.GetString("paid_on")
+	if _, err := time.Parse(time.DateOnly, paidOn); paidOn != "" && err != nil {
+		return e.BadRequestError("Not a calendar day.", validation.Errors{
+			"paid_on": validation.NewError("validation_invalid_date", "Not a calendar day."),
+		})
+	}
+	if paidOn > c.today() {
 		return e.BadRequestError("The quota cannot be paid in the future.", validation.Errors{
 			"paid_on": validation.NewError("validation_date_in_future", "The date is in the future."),
 		})

@@ -31,7 +31,7 @@ func (c *cashBook) syncMonths() error {
 		return err
 	}
 
-	l, err := loadLedger(c.app)
+	l, err := loadLedger(c.app, c.loc)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (c *cashBook) closeMonth(tx core.App, monthID string) error {
 	}
 
 	if sweepTo := month.GetString("sweep_to"); sweepTo != "" {
-		l, err := loadLedger(tx)
+		l, err := loadLedger(tx, c.loc)
 		if err != nil {
 			return err
 		}

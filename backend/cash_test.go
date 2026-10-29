@@ -205,6 +205,7 @@ func TestCashRules(t *testing.T) {
 		{Name: "user deletes a sweep", Method: http.MethodDelete, URL: record("movements", seed.movements["sweep-casa"]), Headers: f.authA(), ExpectedStatus: 404, ExpectedContent: []string{`"data":{}`}},
 		{Name: "user marks the other quota as paid", Method: http.MethodPatch, URL: record("month_quotas", seed.quotas["2026-10/userb"]), Headers: f.authA(), Body: body(`{"paid_on":"2026-10-14"}`), ExpectedStatus: 404, ExpectedContent: []string{`"data":{}`}},
 		{Name: "user marks the own quota as paid", Method: http.MethodPatch, URL: record("month_quotas", seed.quotas["2026-10/usera"]), Headers: f.authA(), Body: body(`{"paid_on":"2026-10-14"}`), ExpectedStatus: 200, ExpectedContent: []string{`"paid_on":"2026-10-14"`}},
+		{Name: "user marks the own quota of a closed month as paid, late", Method: http.MethodPatch, URL: record("month_quotas", seed.quotas["2026-09/userb"]), Headers: f.authB(), Body: body(`{"paid_on":"2026-10-14"}`), ExpectedStatus: 200, ExpectedContent: []string{`"paid_on":"2026-10-14"`}},
 		{Name: "user changes a quota of a closed month", Method: http.MethodPatch, URL: record("month_quotas", seed.quotas["2026-09/usera"]), Headers: f.authA(), Body: body(`{"amount":1}`), ExpectedStatus: 404, ExpectedContent: []string{`"data":{}`}},
 	}
 	for _, collection := range []string{"envelopes", "months", "month_quotas", "month_allocations"} {

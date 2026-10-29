@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"net/http"
-	"regexp"
 	"sort"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 // cashSummary is everything a Conti screen shows for one month, in cents.
@@ -71,9 +72,10 @@ type pieSlice struct {
 	Amount   int    `json:"amount"`
 }
 
+// savingsSeries has a balance for each month of the summary, null before the envelope existed.
 type savingsSeries struct {
 	Envelope string `json:"envelope"`
-	Balances []int  `json:"balances"`
+	Balances []*int `json:"balances"`
 }
 
 type envelopeRow struct {
@@ -86,6 +88,10 @@ type envelopeRow struct {
 	Goal           int    `db:"goal"`
 	OpeningBalance int    `db:"opening_balance"`
 	ArchivedFrom   string `db:"archived_from"`
+	Created        string `db:"created"`
+	// Start is the first month of the envelope: its first allocation, or the month it was created
+	// when it has none.
+	Start string `db:"-"`
 }
 
 type monthRow struct {
@@ -119,11 +125,11 @@ type ledger struct {
 	flows       map[string]map[string]*flow
 }
 
-func loadLedger(app core.App) (*ledger, error) {
+func loadLedger(app core.App, loc *time.Location) (*ledger, error) {
 	l := &ledger{quotas: map[string][]quotaRow{}, allocations: map[string]map[string]int{}, flows: map[string]map[string]*flow{}}
 	db := app.DB()
 
-	if err := db.NewQuery("SELECT id, name, note, kind, slot, position, goal, opening_balance, archived_from FROM envelopes ORDER BY position, created").All(&l.envelopes); err != nil {
+	if err := db.NewQuery("SELECT id, name, note, kind, slot, position, goal, opening_balance, archived_from, created FROM envelopes ORDER BY position, created").All(&l.envelopes); err != nil {
 		return nil, err
 	}
 	if err := db.NewQuery("SELECT id, month, sweep_to, closed_at FROM months ORDER BY month").All(&l.months); err != nil {
@@ -152,6 +158,21 @@ func loadLedger(app core.App) (*ledger, error) {
 			l.allocations[allocation.Month] = map[string]int{}
 		}
 		l.allocations[allocation.Month][allocation.Envelope] += allocation.Amount
+	}
+	for i := range l.envelopes {
+		envelope := &l.envelopes[i]
+		for month, allocations := range l.allocations {
+			if _, ok := allocations[envelope.ID]; ok && (envelope.Start == "" || month < envelope.Start) {
+				envelope.Start = month
+			}
+		}
+		if envelope.Start == "" {
+			created, err := types.ParseDateTime(envelope.Created)
+			if err != nil {
+				return nil, err
+			}
+			envelope.Start = created.Time().In(loc).Format(monthLayout)
+		}
 	}
 
 	var sums []struct {
@@ -203,11 +224,12 @@ func (l *ledger) flowOf(month, envelope string) flow {
 	return flow{}
 }
 
-// activeIn lists, by position, the envelopes that exist in month.
+// activeIn lists, by position, the envelopes that exist in month: from their start to the month
+// before they were archived.
 func (l *ledger) activeIn(month string) []envelopeRow {
 	var active []envelopeRow
 	for _, envelope := range l.envelopes {
-		if envelope.ArchivedFrom == "" || month < envelope.ArchivedFrom {
+		if month >= envelope.Start && (envelope.ArchivedFrom == "" || month < envelope.ArchivedFrom) {
 			active = append(active, envelope)
 		}
 	}
@@ -357,19 +379,21 @@ func (l *ledger) summary(month, current, first string) cashSummary {
 		if envelope.Kind != "save" {
 			continue
 		}
-		series := savingsSeries{Envelope: envelope.ID, Balances: []int{}}
+		series := savingsSeries{Envelope: envelope.ID, Balances: []*int{}}
 		for _, m := range s.Savings.Months {
-			series.Balances = append(series.Balances, l.balance(envelope, m))
+			if m < envelope.Start {
+				series.Balances = append(series.Balances, nil)
+				continue
+			}
+			balance := l.balance(envelope, m)
+			series.Balances = append(series.Balances, &balance)
 		}
 		s.Savings.Series = append(s.Savings.Series, series)
 	}
 	return s
 }
 
-var (
-	monthFormat         = regexp.MustCompile(`^\d{4}-\d{2}$`)
-	errMonthOutOfBounds = errors.New("the month is not between the first one and the current one")
-)
+var errMonthOutOfBounds = errors.New("the month is not between the first one and the current one")
 
 // summaryOf builds the summary of month, the current one when empty.
 func (c *cashBook) summaryOf(app core.App, month string) (cashSummary, error) {
@@ -384,10 +408,10 @@ func (c *cashBook) summaryOf(app core.App, month string) (cashSummary, error) {
 	if err != nil {
 		return cashSummary{}, err
 	}
-	if !monthFormat.MatchString(month) || first == "" || month < first || month > current {
+	if _, err := time.Parse(monthLayout, month); err != nil || first == "" || month < first || month > current {
 		return cashSummary{}, errMonthOutOfBounds
 	}
-	l, err := loadLedger(app)
+	l, err := loadLedger(app, c.loc)
 	if err != nil {
 		return cashSummary{}, err
 	}

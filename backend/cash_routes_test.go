@@ -274,3 +274,59 @@ func TestChainedArchivesKeepTheMoney(t *testing.T) {
 		}
 	})
 }
+
+func TestUnarchiveRefusedAfterChanges(t *testing.T) {
+	var seed *cashSeed
+	f := newFixtureWith(t, func(t testing.TB, app core.App, f *fixture) { seed = seedCash(t, app, f, octoberCurrent) })
+	id := func(key string) string { return seed.envelopes[key].Id }
+
+	t.Run("its destination archived since", func(t *testing.T) {
+		app, book := cashApp(t, f, demoClock)
+		mustArchive(t, book, app, id("svago"), id("spesa"))
+		mustArchive(t, book, app, id("spesa"), id("casa"))
+		if err := book.unarchiveEnvelope(app, id("svago")); err == nil {
+			t.Error("Svago came back into an archived Spesa")
+		}
+	})
+
+	t.Run("the destination given less than it received", func(t *testing.T) {
+		app, book := cashApp(t, f, demoClock)
+		mustArchive(t, book, app, id("svago"), id("spesa"))
+		allocation, err := app.FindFirstRecordByFilter("month_allocations", "month = {:month} && envelope = {:envelope}", dbx.Params{"month": seed.months["2026-10"].Id, "envelope": id("spesa")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		allocation.Set("amount", 10000)
+		if err := app.Save(allocation); err != nil {
+			t.Fatal(err)
+		}
+		if err := book.unarchiveEnvelope(app, id("svago")); err == nil {
+			t.Error("Svago took back 15000 from a Spesa that has 10000")
+		}
+	})
+
+	t.Run("the avanzo moved since", func(t *testing.T) {
+		app, book := cashApp(t, f, demoClock)
+		auto := mustCreate(t, book, app, f.userA.Id, envelopeInput{Name: "Auto", Kind: "save"})
+		mustArchive(t, book, app, id("fondo"), id("vacanze"))
+		october := monthRecord(t, app, "2026-10")
+		october.Set("sweep_to", auto.Id)
+		if err := app.Save(october); err != nil {
+			t.Fatal(err)
+		}
+		if err := book.unarchiveEnvelope(app, id("fondo")); err == nil {
+			t.Error("the undo took the avanzo back from Auto")
+		}
+	})
+}
+
+func TestTheLastSavingsEnvelopeStays(t *testing.T) {
+	var seed *cashSeed
+	f := newFixtureWith(t, func(t testing.TB, app core.App, f *fixture) { seed = seedCash(t, app, f, octoberCurrent) })
+	app, book := cashApp(t, f, demoClock)
+
+	mustArchive(t, book, app, seed.envelopes["vacanze"].Id, seed.envelopes["fondo"].Id)
+	if err := book.archiveEnvelope(app, seed.envelopes["fondo"].Id, seed.envelopes["casa"].Id); err == nil {
+		t.Error("the last savings envelope was archived, leaving the avanzo nowhere to go")
+	}
+}

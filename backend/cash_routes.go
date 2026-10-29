@@ -32,11 +32,15 @@ type archiveUndo struct {
 	Movements  []string `json:"movements"`
 	Transfer   string   `json:"transfer"`
 	WasSweepTo bool     `json:"wasSweepTo"`
+	// SweepToAfter is where archiving moved the avanzo, when it went to this envelope.
+	SweepToAfter string `json:"sweepToAfter"`
 }
 
 var (
 	errUnknownEnvelope = router.NewBadRequestError("Unknown envelope.", nil)
 	errNotArchivedNow  = router.NewBadRequestError("Only an envelope archived today can come back.", nil)
+	errUndoOutdated    = router.NewBadRequestError("The envelopes changed since the archive: it can no longer be undone.", nil)
+	errLastSavings     = router.NewBadRequestError("At least one savings envelope stays, for the avanzo.", nil)
 )
 
 // createEnvelope adds an envelope in the lowest free colour slot, after the others, with its
@@ -124,6 +128,15 @@ func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
 		if envelope.GetString("archived_from") != "" || target.GetString("archived_from") != "" || id == to {
 			return router.NewBadRequestError("Move the envelope into another active envelope.", nil)
 		}
+		if envelope.GetString("kind") == "save" {
+			others, err := tx.FindRecordsByFilter("envelopes", "kind = 'save' && archived_from = '' && id != {:id}", "", 1, 0, dbx.Params{"id": id})
+			if err != nil {
+				return err
+			}
+			if len(others) == 0 {
+				return errLastSavings
+			}
+		}
 
 		current := c.currentMonth()
 		month, err := tx.FindFirstRecordByData("months", "month", current)
@@ -160,7 +173,7 @@ func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
 
 		// What the envelope still holds without its allocation and this month's spending and extras:
 		// a savings balance, or a transfer received this month from another archived envelope.
-		l, err := loadLedger(tx)
+		l, err := loadLedger(tx, c.loc)
 		if err != nil {
 			return err
 		}
@@ -188,8 +201,13 @@ func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
 		}
 
 		if month.GetString("sweep_to") == id {
+			next, err := c.nextSweepTo(tx, target, id)
+			if err != nil {
+				return err
+			}
 			undo.WasSweepTo = true
-			month.Set("sweep_to", c.nextSweepTo(tx, target, id))
+			undo.SweepToAfter = next
+			month.Set("sweep_to", next)
 			if err := tx.Save(month); err != nil {
 				return err
 			}
@@ -202,16 +220,20 @@ func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
 }
 
 // nextSweepTo is where the avanzo goes when its envelope is archived into target: target if it is
-// a savings envelope, else the first other active savings envelope, else nowhere.
-func (c *cashBook) nextSweepTo(tx core.App, target *core.Record, archived string) string {
+// a savings envelope, else the first other active savings envelope, which always exists because the
+// last one cannot be archived.
+func (c *cashBook) nextSweepTo(tx core.App, target *core.Record, archived string) (string, error) {
 	if target.GetString("kind") == "save" {
-		return target.Id
+		return target.Id, nil
 	}
 	savings, err := tx.FindRecordsByFilter("envelopes", "kind = 'save' && archived_from = '' && id != {:archived}", "position", 1, 0, dbx.Params{"archived": archived})
-	if err != nil || len(savings) == 0 {
-		return ""
+	if err != nil {
+		return "", err
 	}
-	return savings[0].Id
+	if len(savings) == 0 {
+		return "", errLastSavings
+	}
+	return savings[0].Id, nil
 }
 
 // unarchiveEnvelope puts back what archiving moved, on the day it happened, as long as no other
@@ -242,16 +264,32 @@ func (c *cashBook) unarchiveEnvelope(app core.App, id string) error {
 			return router.NewBadRequestError("Another envelope has its colour now.", nil)
 		}
 
+		// Only the state the archive left can be undone: a destination archived since, an allocation
+		// lowered below what it received, or an avanzo moved elsewhere would come back wrong.
+		current := c.currentMonth()
+		month, err := tx.FindFirstRecordByData("months", "month", current)
+		if err != nil {
+			return err
+		}
+		target, err := tx.FindRecordById("envelopes", undo.To)
+		if err != nil || target.GetString("archived_from") != "" {
+			return errUndoOutdated
+		}
+		received, err := tx.FindAllRecords("month_allocations", dbx.HashExp{"month": month.Id, "envelope": undo.To})
+		if err != nil {
+			return err
+		}
+		if len(received) == 0 || received[0].GetInt("amount") < undo.Allocation {
+			return errUndoOutdated
+		}
+		if undo.WasSweepTo && month.GetString("sweep_to") != undo.SweepToAfter {
+			return errUndoOutdated
+		}
+
 		// Active again first: the movements below can only go to an active envelope.
 		envelope.Set("archived_from", "")
 		envelope.Set("archive_undo", nil)
 		if err := tx.Save(envelope); err != nil {
-			return err
-		}
-
-		current := c.currentMonth()
-		month, err := tx.FindFirstRecordByData("months", "month", current)
-		if err != nil {
 			return err
 		}
 		if err := c.addToAllocation(tx, month.Id, undo.To, -undo.Allocation); err != nil {
