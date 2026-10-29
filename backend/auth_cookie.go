@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -20,10 +21,18 @@ func registerCookieAuth(app core.App, cfg config) {
 			// Before PocketBase reads the Authorization header.
 			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority - 1,
 			Func: func(e *core.RequestEvent) error {
-				if e.Request.Header.Get("Authorization") == "" && isSameOrigin(e.Request) {
+				if !isSameOrigin(e.Request) {
+					return e.Next()
+				}
+				if e.Request.Header.Get("Authorization") == "" {
 					if cookie, err := e.Request.Cookie(authCookieName); err == nil && cookie.Value != "" {
 						e.Request.Header.Set("Authorization", cookie.Value)
 					}
+				}
+				// Every sign-in and refresh, failed ones included, deletes a cookie left on the old
+				// path: a device that never moved its session drops it at its next start.
+				if strings.HasPrefix(e.Request.URL.Path, "/api/collections/users/auth-") {
+					e.SetCookie(legacyAuthCookieDeletion(cfg))
 				}
 				return e.Next()
 			},
@@ -51,7 +60,6 @@ func registerCookieAuth(app core.App, cfg config) {
 			return e.ForbiddenError("Sign in from the apps.", nil)
 		}
 		e.SetCookie(authCookie(cfg, e.Token, int(e.Collection.AuthToken.Duration)))
-		e.SetCookie(legacyAuthCookieDeletion(cfg))
 		e.Token = ""
 		return e.Next()
 	})

@@ -144,6 +144,19 @@ func TestCookieAuth(t *testing.T) {
 			AfterTestFunc:   expectSession("usera"),
 		},
 		{
+			// A device that never moved its session still sends the old cookie to the other sites:
+			// its first refresh, which fails, deletes it.
+			Name:            "a refresh without a session deletes the cookie of the old path",
+			Method:          http.MethodPost,
+			URL:             "/api/collections/users/auth-refresh",
+			Headers:         map[string]string{"Sec-Fetch-Site": "same-origin"},
+			ExpectedStatus:  401,
+			ExpectedContent: []string{`"data":{}`},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				expectLegacyCookieDeleted(t, res)
+			},
+		},
+		{
 			Name:           "signing out deletes the cookie",
 			Method:         http.MethodPost,
 			URL:            "/api/auth/logout",
