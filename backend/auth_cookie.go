@@ -34,6 +34,7 @@ func registerCookieAuth(app core.App, cfg config) {
 				return e.ForbiddenError("Sign out from the apps.", nil)
 			}
 			e.SetCookie(authCookie(cfg, "", -1))
+			e.SetCookie(legacyAuthCookieDeletion(cfg))
 			return e.NoContent(http.StatusNoContent)
 		})
 		return se.Next()
@@ -50,24 +51,40 @@ func registerCookieAuth(app core.App, cfg config) {
 			return e.ForbiddenError("Sign in from the apps.", nil)
 		}
 		e.SetCookie(authCookie(cfg, e.Token, int(e.Collection.AuthToken.Duration)))
+		e.SetCookie(legacyAuthCookieDeletion(cfg))
 		e.Token = ""
 		return e.Next()
 	})
 }
 
-// authCookie lasts as long as the token in it; a negative maxAge deletes the cookie. Its path keeps
-// it to the API: the other sites on the same domain never receive it on their pages.
+// The apps reach the API under /household/api/, which Caddy hands to PocketBase as /api/. A cookie
+// on that path goes only to this API: the other sites on the domain have no such path, while many
+// have an /api/.
+const (
+	authCookiePath       = "/household/api/"
+	legacyAuthCookiePath = "/api/"
+)
+
+// authCookie lasts as long as the token in it; a negative maxAge deletes the cookie.
 func authCookie(cfg config, token string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     authCookieName,
 		Value:    token,
 		Domain:   cfg.cookieDomain,
-		Path:     "/api/",
+		Path:     authCookiePath,
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}
+}
+
+// legacyAuthCookieDeletion deletes the cookie the apps used on /api/ before, when they first
+// refresh their session on the new path.
+func legacyAuthCookieDeletion(cfg config) *http.Cookie {
+	cookie := authCookie(cfg, "", -1)
+	cookie.Path = legacyAuthCookiePath
+	return cookie
 }
 
 // isSameOrigin tells a request of the app on this host from one another site makes the browser

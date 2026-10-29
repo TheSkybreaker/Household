@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -9,14 +10,27 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-// authCookieFrom returns the auth cookie a response sets, or nil.
+// authCookieFrom returns the auth cookie a response sets for the API path of the apps, or nil.
 func authCookieFrom(res *http.Response) *http.Cookie {
+	return authCookieAt(res, "/household/api/")
+}
+
+func authCookieAt(res *http.Response, path string) *http.Cookie {
 	for _, cookie := range res.Cookies() {
-		if cookie.Name == authCookieName {
+		if cookie.Name == authCookieName && cookie.Path == path {
 			return cookie
 		}
 	}
 	return nil
+}
+
+// expectLegacyCookieDeleted checks that the cookie of the old /api/ path goes away, so the browser
+// stops sending the session to the /api/ paths of the other sites on the domain.
+func expectLegacyCookieDeleted(t testing.TB, res *http.Response) {
+	t.Helper()
+	if legacy := authCookieAt(res, "/api/"); legacy == nil || legacy.MaxAge >= 0 || legacy.Value != "" {
+		t.Fatalf("the cookie of the old path was not deleted: %+v", legacy)
+	}
 }
 
 func TestCookieAuth(t *testing.T) {
@@ -34,9 +48,10 @@ func TestCookieAuth(t *testing.T) {
 			if cookie == nil {
 				t.Fatal("no auth cookie in the response")
 			}
-			if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/api/" || cookie.MaxAge != 90*24*60*60 {
+			if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.MaxAge != 90*24*60*60 {
 				t.Fatalf("cookie attributes %+v", cookie)
 			}
+			expectLegacyCookieDeleted(t, res)
 			record, err := app.FindAuthRecordByToken(cookie.Value, core.TokenTypeAuth)
 			if err != nil || record.GetString("username") != username {
 				t.Fatalf("the cookie does not hold a session of %s: %v", username, err)
@@ -138,6 +153,7 @@ func TestCookieAuth(t *testing.T) {
 				if cookie := authCookieFrom(res); cookie == nil || cookie.MaxAge >= 0 || cookie.Value != "" {
 					t.Fatalf("the cookie was not deleted: %+v", cookie)
 				}
+				expectLegacyCookieDeleted(t, res)
 			},
 		},
 		{
@@ -183,4 +199,19 @@ func TestCookieAuth(t *testing.T) {
 			},
 		},
 	})
+}
+
+// Without a cookie domain each app keeps its own session: in production that has to stop the start.
+func TestCookieDomainIsRequiredOutsideDevelopment(t *testing.T) {
+	production := testConfig(false)
+	if !slices.Contains(production.missingVariables(), "COOKIE_DOMAIN") {
+		t.Error("production starts without COOKIE_DOMAIN")
+	}
+	production.cookieDomain = ".skybreaker.dev"
+	if slices.Contains(production.missingVariables(), "COOKIE_DOMAIN") {
+		t.Error("COOKIE_DOMAIN is set and still missing")
+	}
+	if slices.Contains(testConfig(true).missingVariables(), "COOKIE_DOMAIN") {
+		t.Error("development, where the cookie is for localhost, asks for COOKIE_DOMAIN")
+	}
 }

@@ -70,6 +70,10 @@ func (c config) missingVariables() []string {
 	if c.location == nil {
 		missing = append(missing, "APP_TZ")
 	}
+	// Without it each app would keep its own session; in development the cookie is for localhost.
+	if c.cookieDomain == "" && !c.dev {
+		missing = append(missing, "COOKIE_DOMAIN")
+	}
 	return missing
 }
 
