@@ -363,7 +363,7 @@ Stesso tono della Spesa: frasi brevi, niente punti esclamativi, "avete" quando s
 
 | Dove | Testo |
 | --- | --- |
-| Login, sottotitolo | La cassa comune di casa, divisa in buste. Se sei già entrato nella Spesa, qui sei già dentro. |
+| Login, sottotitolo | La cassa comune di casa, divisa in buste |
 | Login, campi ed errore | Nome utente / Password / Nome utente o password non corretti. |
 | Schede | Mese / Buste / Divisione |
 | Riquadro, titolo | Rimasti nella cassa a {mese} / Rimasti a {mese} |

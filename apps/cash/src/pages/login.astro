@@ -8,7 +8,7 @@ import Page from '../components/Page.astro';
     <main class="login" x-show="ready">
       <div class="login-mark"><Icon name="coins" /></div>
       <h1>Conti</h1>
-      <p class="login-sub">La cassa comune di casa, divisa in buste. Se sei già entrato nella Spesa, qui sei già dentro.</p>
+      <p class="login-sub">La cassa comune di casa, divisa in buste</p>
       <form @submit.prevent="submit()">
         <label class="field">Nome utente<input x-model="username" autocomplete="username" autocapitalize="none" spellcheck="false" required /></label>
         <label class="field">Password<input type="password" x-model="password" autocomplete="current-password" required /></label>

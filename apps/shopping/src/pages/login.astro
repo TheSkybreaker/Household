@@ -1,6 +1,7 @@
 ---
 import Icon from '../components/Icon.astro';
 import Page from '../components/Page.astro';
+import Toast from '../components/Toast.astro';
 ---
 
 <Page page="login">
@@ -8,7 +9,7 @@ import Page from '../components/Page.astro';
     <main class="login" x-show="ready">
       <div class="login-mark"><Icon name="basket" /></div>
       <h1>Spesa</h1>
-      <p class="login-sub">La lista della spesa di casa, aggiornata in tempo reale su tutti e due i telefoni.</p>
+      <p class="login-sub">La lista della spesa di casa, aggiornata su tutti i dispositivi</p>
       <form @submit.prevent="submit()">
         <label class="field">Nome utente<input x-model="username" autocomplete="username" autocapitalize="none" spellcheck="false" required /></label>
         <label class="field">Password<input type="password" x-model="password" autocomplete="current-password" required /></label>
@@ -16,5 +17,7 @@ import Page from '../components/Page.astro';
         <p class="login-error" role="alert" x-show="error" x-text="error"></p>
       </form>
     </main>
+
+    <Toast />
   </div>
 </Page>

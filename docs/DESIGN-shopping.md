@@ -310,7 +310,7 @@ Frasi brevi, iniziale maiuscola e il resto minuscolo, niente punti esclamativi; 
 
 | Dove | Testo |
 |---|---|
-| Login, sottotitolo | La lista della spesa di casa, aggiornata in tempo reale su tutti e due i telefoni. |
+| Login, sottotitolo | La lista della spesa di casa, aggiornata su tutti i dispositivi |
 | Login, errore | Nome utente o password non corretti. |
 | Home, saluto | Ciao {nome} |
 | Home, riepilogo | {n} cose da prendere in {m} liste (al singolare: 1 cosa, 1 lista) |
