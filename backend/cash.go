@@ -43,6 +43,9 @@ func (c *cashBook) registerRoutes(se *core.ServeEvent) {
 	group := se.Router.Group("/api/cash")
 	group.Bind(apis.RequireAuth("users"))
 	group.GET("/summary", c.handleSummary)
+	group.POST("/envelopes", c.handleCreateEnvelope)
+	group.POST("/envelopes/{id}/archive", c.handleArchiveEnvelope)
+	group.POST("/envelopes/{id}/unarchive", c.handleUnarchiveEnvelope)
 }
 
 // today is the calendar day in the app time zone, as YYYY-MM-DD.
