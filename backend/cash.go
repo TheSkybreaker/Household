@@ -19,11 +19,23 @@ type cashBook struct {
 func registerCash(app core.App, cfg config, now func() time.Time) *cashBook {
 	c := &cashBook{app: app, loc: cfg.location, now: now}
 	c.registerHooks()
+
+	// Every night at 00:10 in Rome, and at every start in case the server was off at midnight.
+	app.Cron().SetTimezone(cfg.location)
+	app.Cron().MustAdd("cashMonths", "10 0 * * *", c.logSyncMonths)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		c.logSyncMonths()
 		c.registerRoutes(se)
 		return se.Next()
 	})
 	return c
+}
+
+// logSyncMonths runs syncMonths where nobody waits for its error.
+func (c *cashBook) logSyncMonths() {
+	if err := c.syncMonths(); err != nil {
+		c.app.Logger().Error("Opening or closing the Conti months failed", "error", err)
+	}
 }
 
 // registerRoutes binds /api/cash/*: every route needs a signed-in user.
