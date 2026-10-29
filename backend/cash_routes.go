@@ -132,17 +132,6 @@ func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
 		}
 		undo := archiveUndo{Date: c.today(), To: to, Movements: []string{}}
 
-		// The balance up to last month, before this month's movements leave.
-		var balance int
-		if envelope.GetString("kind") == "save" {
-			l, err := loadLedger(tx)
-			if err != nil {
-				return err
-			}
-			row, _ := l.envelope(id)
-			balance = l.balance(row, previousMonth(current))
-		}
-
 		allocations, err := tx.FindAllRecords("month_allocations", dbx.HashExp{"month": month.Id, "envelope": id})
 		if err != nil {
 			return err
@@ -169,10 +158,20 @@ func (c *cashBook) archiveEnvelope(app core.App, id string, to string) error {
 			undo.Movements = append(undo.Movements, movement.Id)
 		}
 
-		if balance != 0 {
-			from, into, amount := id, to, balance
-			if balance < 0 {
-				from, into, amount = to, id, -balance
+		// What the envelope still holds without its allocation and this month's spending and extras:
+		// a savings balance, or a transfer received this month from another archived envelope.
+		l, err := loadLedger(tx)
+		if err != nil {
+			return err
+		}
+		remaining := l.left(id, current)
+		if row, _ := l.envelope(id); row.Kind == "save" {
+			remaining = l.balance(row, current)
+		}
+		if remaining != 0 {
+			from, into, amount := id, to, remaining
+			if remaining < 0 {
+				from, into, amount = to, id, -remaining
 			}
 			author, err := firstUser(tx)
 			if err != nil {

@@ -247,3 +247,30 @@ func TestEnvelopeRoutes(t *testing.T) {
 			ExpectedStatus: 400, ExpectedContent: []string{`"data":{}`}},
 	})
 }
+
+func TestChainedArchivesKeepTheMoney(t *testing.T) {
+	var seed *cashSeed
+	f := newFixtureWith(t, func(t testing.TB, app core.App, f *fixture) { seed = seedCash(t, app, f, octoberCurrent) })
+	id := func(key string) string { return seed.envelopes[key].Id }
+
+	t.Run("savings into savings into a new one", func(t *testing.T) {
+		app, book := cashApp(t, f, demoClock)
+		auto := mustCreate(t, book, app, f.userA.Id, envelopeInput{Name: "Auto", Kind: "save"})
+		mustArchive(t, book, app, id("vacanze"), id("fondo"))
+		mustArchive(t, book, app, id("fondo"), auto.Id)
+		// Fondo 339710 and Vacanze 18000 at the end of October.
+		if balance := value(envelopeNamed(t, summaryOf(t, book, app, "2026-10"), "Auto").Balance); balance != 357710 {
+			t.Errorf("Auto balance %v, want 357710", balance)
+		}
+	})
+
+	t.Run("savings into a spend envelope into another", func(t *testing.T) {
+		app, book := cashApp(t, f, demoClock)
+		mustArchive(t, book, app, id("vacanze"), id("casa"))
+		mustArchive(t, book, app, id("casa"), id("spesa"))
+		// Spesa 35000 plus Casa's 20000 plus Vacanze's 18000.
+		if left := value(envelopeNamed(t, summaryOf(t, book, app, "2026-10"), "Spesa").Left); left != 73000 {
+			t.Errorf("Spesa left %v, want 73000", left)
+		}
+	})
+}

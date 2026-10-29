@@ -17,12 +17,6 @@ func nextMonth(month string) string {
 	return t.AddDate(0, 1, 0).Format(monthLayout)
 }
 
-// previousMonth is the month before month, both YYYY-MM.
-func previousMonth(month string) string {
-	t, _ := time.Parse(monthLayout, month)
-	return t.AddDate(0, -1, 0).Format(monthLayout)
-}
-
 // lastDay is the last day of month, as YYYY-MM-DD.
 func lastDay(month string) string {
 	t, _ := time.Parse(monthLayout, month)
