@@ -135,10 +135,11 @@ Cinque collezioni nuove, più il campo `app` su `push_subscriptions`; `users` è
 | note | text, max 40 | Sottotitolo, per esempio "Affitto e bollette" |
 | kind | select: `spend`, `save` | Non modificabile dopo la creazione |
 | goal | number intero, min 0 | Solo `save`; 0 vuol dire nessun obiettivo |
-| opening_balance | number intero, min 0 | Solo `save`: saldo già presente all'inizio, impostato dalla dashboard |
+| opening_balance | number intero, min 0 | Solo `save`: soldi già da parte prima di Conti, dal campo Già da parte alla creazione |
 | slot | number intero, 1-6 | Colore della busta; unico tra le buste attive |
 | position | number intero | Ordine di visualizzazione |
 | archived_from | text, pattern `^\d{4}-\d{2}$` | Vuoto se attiva; altrimenti il primo mese in cui non c'è più |
+| archive_undo | json, nascosto dalle API | Cosa ha spostato l'archiviazione, per l'Annulla dello stesso giorno |
 | created_by | relation a users |  |
 
 - List e view: autenticato. Update: autenticato, solo `name`, `note`, `goal`, `position`.
@@ -213,13 +214,14 @@ Tutti i numeri si calcolano sul server con query aggregate, in un'unica route di
 - Busta di spesa, disponibile = allocato + extra + spostati − spese, solo del mese m.
 - Busta di risparmio, saldo a fine m = `opening_balance` + la stessa somma su tutti i mesi fino a m compreso.
 - Avanzo previsto del mese in corso = somma dei disponibili delle buste di spesa attive.
+- Cassa in tutto a fine m = somma degli `opening_balance` di tutte le buste + entrati − spesi di tutti i mesi fino a m compreso: i soldi che ci sono davvero.
 
 ### Route
 
 | Metodo e percorso | Cosa fa |
 | --- | --- |
 | GET /api/cash/summary?month= | Riepilogo del mese: quote, entrati, spesi, rimasti, in arrivo, buste con i loro numeri, avanzo previsto o effettivo, torta per busta del mese e dall'inizio, serie dei risparmi dall'inizio al mese in corso |
-| POST /api/cash/envelopes | Crea una busta `{ name, kind, amount, goal }` e la sua allocazione nel mese in corso, nello slot libero più basso. Rifiuta oltre 6 buste attive |
+| POST /api/cash/envelopes | Crea una busta `{ name, kind, amount, goal, opening_balance }` e la sua allocazione nel mese in corso, nello slot libero più basso. Rifiuta oltre 6 buste attive |
 | POST /api/cash/envelopes/{id}/archive | Archivia con `{ to }`: sposta allocazione e movimenti del mese in corso nella busta `to`, per le buste di risparmio crea un `transfer` con `reason = archive` del saldo restante, sposta la busta dell'avanzo se era questa, imposta `archived_from` al mese in corso. Tutto in una transazione |
 | POST /api/cash/envelopes/{id}/unarchive | Annulla un'archiviazione fatta oggi: serve per l'"Annulla" del toast |
 
@@ -284,12 +286,13 @@ Tre schede con una barra in basso (Mese, Buste, Divisione), il pulsante Aggiungi
 - Stessa navigazione tra i mesi. Sottotitolo con l'avanzo: "A fine mese l'avanzo va nel {busta}: se il mese finisse oggi sarebbero {importo}"; nei mesi chiusi quanto ci è finito davvero.
 - Busta di spesa: pallino colorato, nome, nota, "{importo} restano" (nei mesi chiusi "avanzati, nel fondo"), barra dello speso nel colore della busta, "Spesi {x} di {y}". Oltre il budget: importo e barra in rosso, "oltre la busta".
 - Busta di risparmio: saldo, "di {obiettivo}", barra verso l'obiettivo, "+{allocato} al mese" più extra e avanzo, percentuale dell'obiettivo.
+- In cima, sopra le buste, la riga del saldo totale: "In cassa in tutto {importo}" a fine del mese guardato (a oggi nel mese in corso).
 - Grafico dei risparmi sotto le buste.
 
 ### Scheda Divisione
 
 - Titolo, spiegazione e la barra "Ogni mese" con legenda (vedi Grafici).
-- Modulo, sempre del mese in corso: quote mensili delle due persone, importo mensile di ogni busta, obiettivo delle buste di risparmio, busta dell'avanzo (chip), nuova busta (tipo e nome, poi "Aggiungi"), cestino accanto a ogni busta.
+- Modulo, sempre del mese in corso: quote mensili delle due persone, importo mensile di ogni busta, obiettivo delle buste di risparmio, busta dell'avanzo (chip), nuova busta (tipo e nome, per le buste di risparmio anche "Già da parte", poi "Aggiungi"), cestino accanto a ogni busta.
 - Ogni campo si salva da solo su `change` (uscita dal campo o Invio), con un toast tipo "Spesa: 300 € al mese" e la barra aggiornata. Niente pulsante Salva. Un valore non valido non si salva e la riga di riepilogo lo dice.
 - Riga di riepilogo fissa in basso: "Si salva da solo. Versate X, assegnati Y." e poi "Tutto assegnato", "Da assegnare Z" o, in rosso, "Mancano Z". Si può salvare anche con soldi mancanti.
 
@@ -299,7 +302,7 @@ Tre schede con una barra in basso (Mese, Buste, Divisione), il pulsante Aggiungi
 | --- | --- |
 | Aggiungi | Interruttore Spesa o Versamento extra; importo grande con tastiera decimale; scorciatoia dalla Spesa; descrizione; per l'extra "Di chi sono"; busta (chip, solo attive); anteprima dell'effetto ("Nella busta Spesa restano…", "Fondo emergenza arriva a…"); data, non nel futuro |
 | Busta | Numeri del mese, movimenti del mese, azioni: Aggiungi una spesa, oppure Aggiungi soldi e Preleva per una spesa; Elimina la busta nel mese in corso |
-| Movimento | Importo, dettagli, "Elimina il movimento" con doppio tocco e poi Annulla nel toast. Per una quota: "Segna come non versato". Per un trasferimento o un avanzo: solo lettura |
+| Movimento | Importo, dettagli, "Modifica" che apre il pannello Aggiungi già compilato, "Elimina il movimento" con doppio tocco e poi Annulla nel toast. Per una quota: "Segna come non versato". Per un trasferimento o un avanzo: solo lettura |
 | Elimina busta | Cosa si sposta (quota mensile, movimenti del mese, saldo), chip della busta di destinazione già proposta, pulsante rosso, poi toast con Annulla |
 | Profilo | Avatar, nome utente, interruttore notifiche, icone delle altre app, Esci |
 
@@ -369,6 +372,9 @@ Stesso tono della Spesa: frasi brevi, niente punti esclamativi, "avete" quando s
 | Stato quota | Versato il {giorno} / Segna come versato / Da versare |
 | Torta | Spese per busta / {totale} spesi a {mese}. Tocca una fetta o una riga per i dettagli. |
 | Buste, sottotitolo | A fine mese l'avanzo va nel {busta}: se il mese finisse oggi sarebbero {importo}. |
+| Buste, saldo totale | In cassa in tutto {importo} |
+| Modifica movimento | Modifica spesa / Modifica versamento / Salva / Movimento salvato |
+| Nuova busta di risparmio | Già da parte |
 | Busta di spesa | {importo} restano / avanzati, nel fondo / oltre la busta / Spesi {x} di {y} |
 | Busta di risparmio | di {obiettivo} / +{importo} al mese / {n}% dell'obiettivo |
 | Divisione, spiegazione | Quanto versa ognuno ogni mese e come lo dividete tra le buste. Le modifiche valgono da {mese} in poi. |
@@ -479,11 +485,11 @@ Sei milestone in sequenza; la prima tocca anche la Spesa e porta già in produzi
 
 ## Fuori perimetro e decisioni aperte
 
-Quattro punti da chiudere prima della milestone 3; il resto aspetta.
+Quattro punti da chiudere prima della milestone 3, tutti decisi il 2026-10-29.
 
-- [ ] Modifica di un movimento: la demo permette solo di eliminarlo e rifarlo. Se serve nella v1, stesso pannello di Aggiungi precompilato.
-- [ ] Saldo totale della cassa (tutti i risparmi più i rimasti del mese): oggi non si vede da nessuna parte.
-- [ ] Saldi iniziali delle buste di risparmio: per ora si impostano a mano nella dashboard (`opening_balance`).
+- [x] Modifica di un movimento: nella v1, con il pannello Aggiungi già compilato.
+- [x] Saldo totale della cassa: una riga in cima alla scheda Buste, "In cassa in tutto {importo}", calcolata come i soldi che ci sono davvero (vedi Formule).
+- [x] Saldi iniziali delle buste di risparmio: campo "Già da parte" quando si crea la busta, niente dashboard.
 - [x] Design doc della Spesa da allineare a questo per sottodominio, login con cookie e push per app.
 
 Dopo la v1: riordinare le buste trascinandole, più di 6 buste, esportazione in CSV, promemoria per la quota non ancora versata a metà mese.
