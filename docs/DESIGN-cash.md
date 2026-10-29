@@ -56,7 +56,7 @@ Il telefono parla solo con Caddy; il cookie sul dominio padre fa valere un login
 
 ### Login condiviso
 
-- PocketBase autentica con un token nell'header `Authorization`. Il token vive solo in un cookie `pb_auth` HttpOnly, Secure, SameSite=Lax, con scadenza a 90 giorni, sul dominio `COOKIE_DOMAIN` e con path `/household/api/`: il JavaScript delle app non lo vede mai, e gli altri siti di skybreaker.dev non lo ricevono, né sulle loro pagine né sulle loro `/api/`. Fino al 2026-10-29 il path era `/api/`: login, rinnovo e uscita cancellano quel cookie, e all'apertura un'app rinnova una volta sul percorso vecchio per spostare la sessione sul nuovo, senza chiedere di nuovo il login.
+- PocketBase autentica con un token nell'header `Authorization`. Il token vive solo in un cookie `pb_auth` HttpOnly, Secure, SameSite=Lax, con scadenza a 90 giorni, sul dominio `COOKIE_DOMAIN` e con path `/household/api/`: il JavaScript delle app non lo vede mai, e gli altri siti di skybreaker.dev non lo ricevono, né sulle loro pagine né sulle loro `/api/`. Fino al 2026-10-29 il path era `/api/`: login, rinnovo e uscita cancellano un cookie rimasto lì.
 - Un middleware Go, che gira prima di quello con cui PocketBase legge il token, copia il cookie nell'header `Authorization` quando la richiesta non ne ha già uno e arriva dalla stessa origine: `Sec-Fetch-Site: same-origin`, oppure, senza quell'header, `Origin` uguale all'host. Per il browser tutti i sottodomini di skybreaker.dev sono lo stesso sito, quindi SameSite da solo non ferma una richiesta falsificata da un altro sottodominio.
 - Login e rinnovo (`auth-with-password` e `auth-refresh` della collezione `users`): un hook scrive il cookie con il token nuovo e lo toglie dalla risposta JSON, che porta solo il record dell'utente. Login, rinnovo e uscita dalla stessa origine soltanto: da un altro sito rispondono 403, così nessuno può mettere il proprio account nel cookie o far uscire l'utente.
 - All'avvio ogni app chiama `auth-refresh`: la risposta dà l'utente e rinnova il cookie; un 401 porta al login. Senza rete l'app usa l'ultimo utente salvato in localStorage (solo id, nome, nome utente e colore) e apre in sola lettura.
@@ -413,15 +413,11 @@ shopping.skybreaker.dev {
   handle /_/* {
     respond 404
   }
-  @superusers path /api/collections/_superusers/* /api/collections/pbc_3142635823/* /household/api/collections/_superusers/* /household/api/collections/pbc_3142635823/*
+  @superusers path /household/api/collections/_superusers/* /household/api/collections/pbc_3142635823/*
   handle @superusers {
     respond 404
   }
   handle_path /household/* {
-    reverse_proxy 127.0.0.1:8090
-  }
-  # Il percorso di prima, per il rinnovo che sposta il cookie da /api/.
-  handle /api/* {
     reverse_proxy 127.0.0.1:8090
   }
   handle {

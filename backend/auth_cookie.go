@@ -79,8 +79,8 @@ func authCookie(cfg config, token string, maxAge int) *http.Cookie {
 	}
 }
 
-// legacyAuthCookieDeletion deletes the cookie the apps used on /api/ before, when they first
-// refresh their session on the new path.
+// legacyAuthCookieDeletion deletes a cookie left on /api/ from before 2026-10-29, which browsers
+// would otherwise send to the /api/ paths of the other sites until it expires.
 func legacyAuthCookieDeletion(cfg config) *http.Cookie {
 	cookie := authCookie(cfg, "", -1)
 	cookie.Path = legacyAuthCookiePath

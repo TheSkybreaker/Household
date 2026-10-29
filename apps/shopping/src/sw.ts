@@ -17,32 +17,8 @@ cleanupOutdatedCaches();
 
 // registerType autoUpdate: each new version skips waiting and claims the pages, which load it at
 // their next navigation (see src/lib/pwa.ts).
-//
-// The Spesa from before the shared login cannot keep the cookie session and ends on its login page,
-// so its pages are reloaded at once; the marker cache tells that generation apart.
-const GENERATION_CACHE = 'household-generation-1';
-let replacingOldGeneration = false;
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    (async () => {
-      replacingOldGeneration = !!self.registration.active && !(await caches.has(GENERATION_CACHE));
-      await self.skipWaiting();
-    })(),
-  );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    (async () => {
-      await caches.open(GENERATION_CACHE);
-      await self.clients.claim();
-      if (!replacingOldGeneration) return;
-      const windows = await self.clients.matchAll({ type: 'window' });
-      await Promise.all(windows.map((window) => (window as WindowClient).navigate(window.url)));
-    })(),
-  );
-});
+self.addEventListener('install', () => void self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener('push', (event) => {
   const payload = event.data?.json() as PushPayload | undefined;

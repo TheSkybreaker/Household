@@ -41,9 +41,9 @@ describe('refreshSession', () => {
     expect(url(0)).toContain('/household/api/collections/users/auth-refresh');
   });
 
-  it('signs out and forgets the user when the cookie is rejected on both paths', async () => {
+  it('signs out and forgets the user when the cookie is rejected', async () => {
     localStorage.setItem('household:user', JSON.stringify(publicUser));
-    fetchMock.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(rejected());
+    fetchMock.mockResolvedValueOnce(rejected());
     expect(await refreshSession()).toBe('signed-out');
     expect(cachedUser()).toBeNull();
   });
@@ -53,14 +53,6 @@ describe('refreshSession', () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     expect(await refreshSession()).toBe('offline');
     expect(cachedUser()).toEqual(publicUser);
-  });
-
-  it('moves the session of the cookie on the old /api/ path, once', async () => {
-    fetchMock.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(json(200, { token: '', record })).mockResolvedValueOnce(json(200, { token: '', record }));
-    expect(await refreshSession()).toBe('signed-in');
-    expect(url(1)).toMatch(/^(https?:\/\/[^/]+)?\/api\/collections\/users\/auth-refresh/);
-    expect(url(2)).toContain('/household/api/collections/users/auth-refresh');
-    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('exchanges the token of the old localStorage session once', async () => {
