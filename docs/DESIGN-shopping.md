@@ -343,6 +343,7 @@ In sviluppo bastano un PC e un telefono via USB; in produzione il server `portfo
 | VAPID_SUBJECT | indirizzo di contatto | Richiesto dai push service; anche un URL https. `mailto:` lo aggiunge `webpush-go` |
 | DEV | 1 | Abilita `/api/push/test` e l'automigrate |
 | COOKIE_DOMAIN | `.skybreaker.dev` | Dominio del cookie della sessione condivisa con Conti; vuoto in sviluppo |
+| APP_TZ | `Europe/Rome` | Fuso di "oggi" e della chiusura dei mesi di Conti; obbligatoria, senza il server non parte |
 
 Il comando `vapid` stampa una coppia di chiavi con `webpush.GenerateVAPIDKeys()`. In locale le variabili stanno in un `.env` ignorato da git.
 

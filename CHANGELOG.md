@@ -1,5 +1,10 @@
 # Changelog
 
+## Conti milestone 2: backend
+
+- The five Conti collections with their rules, every write checked on the server (dates in Rome time, envelopes that no longer exist, the current month only for the split), and `GET /api/cash/summary` with each month's money in and out, envelopes, pies, savings series and the money really in the box.
+- Envelopes created, archived into another one and restored the same day through `/api/cash/envelopes`; every night at 00:10, and at each start, missing months open as copies of the previous one and past months close, moving each spend envelope's leftover or overrun to or from the avanzo envelope. `APP_TZ` is now required.
+
 ## Conti milestone 1: shared infrastructure
 
 - pnpm monorepo with the Spesa in `apps/shopping`, Conti in `apps/cash` (login and profile) and `packages/shared` (session client, amounts, dates, app list, shared components and styles); the backend is the Go module `household` and no longer serves files.

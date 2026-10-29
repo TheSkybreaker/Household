@@ -393,7 +393,7 @@ In sviluppo girano un PocketBase e due server Astro su localhost; in produzione 
 | Variabile | Dove | Note |
 | --- | --- | --- |
 | VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT | backend | Le stesse della Spesa |
-| APP_TZ | backend | `Europe/Rome`, per "oggi" e per il cron |
+| APP_TZ | backend | `Europe/Rome`, per "oggi" e per il cron; obbligatoria, senza il server non parte |
 | COOKIE_DOMAIN | backend | `.skybreaker.dev` in produzione, vuoto in sviluppo; il cookie lo scrive il server |
 | DEV | backend | Abilita le route di prova delle push |
 
@@ -453,11 +453,11 @@ Sei milestone in sequenza; la prima tocca anche la Spesa e porta già in produzi
 
 ### 2. Backend di Conti
 
-- [ ] Migrazioni delle cinque collezioni con regole e indici
-- [ ] Hook dei movimenti: validazione per tipo, `month` ricavato, buste archiviate rifiutate
-- [ ] Route di riepilogo, creazione e archiviazione delle buste
-- [ ] Cron di apertura e chiusura del mese, idempotente e in transazione
-- [ ] Test Go dello scenario della demo: rimasti, saldi, avanzo con uno sforamento, archiviazione con spostamento del saldo
+- [x] Migrazioni delle cinque collezioni con regole e indici
+- [x] Hook dei movimenti: validazione per tipo, `month` ricavato, buste archiviate rifiutate
+- [x] Route di riepilogo, creazione e archiviazione delle buste
+- [x] Cron di apertura e chiusura del mese, idempotente e in transazione
+- [x] Test Go dello scenario della demo: rimasti, saldi, avanzo con uno sforamento, archiviazione con spostamento del saldo
 
 ### 3. Scheda Mese
 
