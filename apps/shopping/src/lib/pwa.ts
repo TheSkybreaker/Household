@@ -1,5 +1,5 @@
 import { registerSW } from 'virtual:pwa-register';
-import { session, toast } from './stores';
+import { session } from './stores';
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -7,13 +7,11 @@ interface InstallPromptEvent extends Event {
 
 let installPrompt: InstallPromptEvent | null = null;
 
+// A new version takes over by itself (registerType autoUpdate). onNeedReload replaces the reload
+// the plugin would do then, so the page in use stays as it is: the new version arrives with the
+// next page load, such as reopening the app or opening a list.
 export function registerServiceWorker() {
-  const updateServiceWorker = registerSW({
-    onNeedRefresh() {
-      // Stays until tapped: a new version is worth not missing.
-      toast().show('Nuova versione disponibile', { label: 'Aggiorna', run: () => void updateServiceWorker(true) }, null);
-    },
-  });
+  registerSW({ onNeedReload() {} });
 }
 
 // Chrome offers the install prompt once per page load; the profile shows "Installa l'app" while it is available.

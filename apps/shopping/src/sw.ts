@@ -15,22 +15,18 @@ interface ShowNotificationOptions extends NotificationOptions {
 precacheAndRoute(self.__WB_MANIFEST, { ignoreURLParametersMatching: [/.*/] });
 cleanupOutdatedCaches();
 
-// "Aggiorna" in the new version toast activates the waiting service worker.
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') void self.skipWaiting();
-});
-
-// The Spesa from before the shared login cannot keep the cookie session, so it ends on its login
-// page, which has no update toast. The first worker of this generation therefore replaces it at
-// once and reloads its pages; the marker cache makes every later update wait for Aggiorna again.
+// registerType autoUpdate: each new version skips waiting and claims the pages, which load it at
+// their next navigation (see src/lib/pwa.ts).
+//
+// The Spesa from before the shared login cannot keep the cookie session and ends on its login page,
+// so its pages are reloaded at once; the marker cache tells that generation apart.
 const GENERATION_CACHE = 'household-generation-1';
 let replacingOldGeneration = false;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      if (!self.registration.active || (await caches.has(GENERATION_CACHE))) return;
-      replacingOldGeneration = true;
+      replacingOldGeneration = !!self.registration.active && !(await caches.has(GENERATION_CACHE));
       await self.skipWaiting();
     })(),
   );
@@ -40,8 +36,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       await caches.open(GENERATION_CACHE);
-      if (!replacingOldGeneration) return;
       await self.clients.claim();
+      if (!replacingOldGeneration) return;
       const windows = await self.clients.matchAll({ type: 'window' });
       await Promise.all(windows.map((window) => (window as WindowClient).navigate(window.url)));
     })(),

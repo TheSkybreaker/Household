@@ -235,7 +235,7 @@ L'app si installa da Chrome come WebAPK, si apre anche offline in sola lettura e
 - Icone: 192 e 512 px, più una 512 px maskable con il cestino su fondo azzurro e margine di sicurezza del 20%. Badge per le notifiche: 96 px monocromatico.
 - Precache dell'app shell (HTML, CSS, JS, font, icone) con Workbox tramite `injectManifest`. Le chiamate a `/api/*` non passano mai dalla cache.
 - Offline: l'app mostra l'ultimo stato letto, salvato in localStorage per ogni vista, con il banner Sei offline, le modifiche sono in pausa. Campo di inserimento e azioni restano disattivati finché torna la rete.
-- Nuova versione del service worker: toast Nuova versione disponibile con azione Aggiorna, che fa `skipWaiting` e ricarica.
+- Nuova versione: il service worker si installa e prende il controllo da solo (`registerType: 'autoUpdate'`, `skipWaiting` e `clients.claim` in `sw.ts`). La pagina aperta non si ricarica, perché `onNeedReload` di `registerSW` non fa niente: la versione nuova arriva al caricamento successivo, riaprendo l'app o aprendo una lista. Solo la Spesa di prima del login condiviso viene ricaricata subito.
 - Installazione: intercetta `beforeinstallprompt` e mostra Installa l'app nel profilo finché l'app non risulta installata.
 - Head: `viewport-fit=cover`, safe area gestite come nella demo, `theme-color` #3AA6E8 come nella demo.
 
@@ -333,7 +333,6 @@ Frasi brevi, iniziale maiuscola e il resto minuscolo, niente punti esclamativi; 
 | Azione dei toast | Annulla |
 | Offline | Sei offline, le modifiche sono in pausa |
 | Notifiche negate | Riattivale da Impostazioni Android, app Spesa, Notifiche. |
-| Aggiornamento app | Nuova versione disponibile / Aggiorna |
 
 ## Configurazione, sviluppo locale e deploy
 

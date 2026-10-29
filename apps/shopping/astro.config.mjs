@@ -15,10 +15,11 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'prompt',
+      // Each new version installs and takes over by itself; src/lib/pwa.ts keeps the open page as is.
+      registerType: 'autoUpdate',
       // @vite-pwa/astro resolves Astro 7's output to .astro: the paths are set explicitly.
       outDir,
-      // src/lib/pwa.ts registers the service worker, to show the update toast.
+      // src/lib/pwa.ts registers the service worker.
       injectRegister: false,
       manifest: {
         name: 'Spesa',

@@ -3,7 +3,8 @@
 ## Spesa: cose non prese
 
 - A new list can take over what is still to buy on the latest list up to today: one batch creates the list and the copies and marks the old items as taken, all or nothing. The Passate show only the last 30 days.
-- Items one person adds to a list within 3 seconds go out as one push with every name; the Spesa login shows the update prompt, and the first new service worker replaces the old Spesa at once.
+- Items one person adds to a list within 3 seconds go out as one push with every name.
+- New versions of the Spesa install and take over by themselves, without a prompt; the page in use is not reloaded and gets the new version at its next load. The Spesa from before the shared login is replaced and reloaded at once.
 
 ## Conti milestone 2: backend
 
