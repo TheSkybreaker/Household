@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { notificationDay, notificationText, type PushPayload } from './notification';
+import { notificationDay, notificationItems, notificationText, type PushPayload } from './notification';
 
 const thursday = new Date(2026, 9, 1, 20);
 const payload: PushPayload = {
@@ -25,5 +25,17 @@ describe('notificationDay', () => {
     expect(notificationDay('2026-10-02', thursday)).toBe('domani');
     expect(notificationDay('2026-10-03', thursday)).toBe('sabato 3 ottobre');
     expect(notificationDay('2026-09-30', thursday)).toBe('mercoledì 30 settembre');
+  });
+});
+
+describe('notificationItems', () => {
+  const base = { type: 'item_added', listId: 'l1', listTitle: 'Spesa', listDate: '2026-10-03', qty: '', by: 'Martina' } as const;
+
+  it('adds every item of a grouped push after the ones already shown', () => {
+    expect(notificationItems(['Pane'], { ...base, item: 'Uova', items: ['Latte', 'Uova'] })).toEqual(['Pane', 'Latte', 'Uova']);
+  });
+
+  it('takes the single item of a push without the list of items', () => {
+    expect(notificationItems([], { ...base, item: 'Pane' })).toEqual(['Pane']);
   });
 });

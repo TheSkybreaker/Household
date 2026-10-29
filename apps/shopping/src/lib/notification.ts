@@ -8,6 +8,8 @@ export interface PushPayload {
   listDate: string;
   item: string;
   qty: string;
+  // Every item of a grouped push, in order; item is the last one.
+  items?: string[];
   by: string;
 }
 
@@ -17,6 +19,11 @@ const longFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'num
 export function notificationDay(isoDate: string, now = new Date()): string {
   const relative = relativeDay(isoDate, now);
   return relative === 'Oggi' || relative === 'Domani' ? relative.toLowerCase() : longFormat.format(fromIsoDate(isoDate));
+}
+
+// The items of the notification for a list: those it already shows, then the ones of this push.
+export function notificationItems(shown: string[], payload: PushPayload): string[] {
+  return [...shown, ...(payload.items?.length ? payload.items : [payload.item])];
 }
 
 // items: every item of the notification for this list, the new one last.

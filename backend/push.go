@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
@@ -11,6 +12,8 @@ import (
 const (
 	pushTTL     = 12 * 60 * 60 // seconds
 	pushTimeout = 10 * time.Second
+	// Items added to a list by one person within this time go out as one push.
+	pushGroupDelay = 3 * time.Second
 )
 
 // The apps a push subscription can belong to; each has its own service worker.
@@ -23,21 +26,26 @@ const (
 type sendFunc func(message []byte, subscription *webpush.Subscription, options *webpush.Options) (*http.Response, error)
 
 type pusher struct {
-	app    core.App
-	cfg    config
-	send   sendFunc
-	client *http.Client
+	app        core.App
+	cfg        config
+	send       sendFunc
+	client     *http.Client
+	groupDelay time.Duration
+
+	mu      sync.Mutex
+	pending map[string][]*core.Record
 }
 
 // registerPush binds the /api/push routes and the hooks that send the pushes of each app.
-func registerPush(app core.App, cfg config, send sendFunc) {
-	p := &pusher{app: app, cfg: cfg, send: send, client: &http.Client{Timeout: pushTimeout}}
+func registerPush(app core.App, cfg config, send sendFunc) *pusher {
+	p := &pusher{app: app, cfg: cfg, send: send, client: &http.Client{Timeout: pushTimeout}, groupDelay: pushGroupDelay, pending: map[string][]*core.Record{}}
 	registerShoppingHooks(app, p)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		registerPushRoutes(se, p)
 		return se.Next()
 	})
+	return p
 }
 
 // deliver sends one push. A subscription the push service no longer knows is deleted; other

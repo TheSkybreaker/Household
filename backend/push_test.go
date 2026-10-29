@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -102,7 +103,7 @@ func TestNotifyItemAddedSkipsAuthorAndDropsGoneSubscriptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.notifyItemAdded(item); err != nil {
+	if err := p.notifyItemsAdded([]*core.Record{item}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,8 +112,8 @@ func TestNotifyItemAddedSkipsAuthorAndDropsGoneSubscriptions(t *testing.T) {
 	}
 
 	push := service.sent[0]
-	wantPayload := pushPayload{Type: "item_added", ListID: f.list.Id, ListTitle: "Spesa", ListDate: "2026-10-03", Item: "Pane", By: "User A"}
-	if push.payload != wantPayload {
+	wantPayload := pushPayload{Type: "item_added", ListID: f.list.Id, ListTitle: "Spesa", ListDate: "2026-10-03", Item: "Pane", Items: []string{"Pane"}, By: "User A"}
+	if !reflect.DeepEqual(push.payload, wantPayload) {
 		t.Fatalf("payload = %+v, want %+v", push.payload, wantPayload)
 	}
 	if push.options.TTL != 12*60*60 || push.options.Urgency != webpush.UrgencyHigh || push.options.Topic != f.list.Id ||
@@ -146,7 +147,7 @@ func TestCreatingAnItemPushesToThePartner(t *testing.T) {
 				t.Fatal(err)
 			}
 			addSubscription(t, app, f.userB, "https://push.example.com/b", appShopping)
-			registerPush(app, testConfig(false), service.send)
+			registerPush(app, testConfig(false), service.send).groupDelay = 10 * time.Millisecond
 			return app
 		},
 		ExpectedStatus:  200,
@@ -282,7 +283,7 @@ func TestItemPushReachesOnlyTheSpesa(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.notifyItemAdded(item); err != nil {
+	if err := p.notifyItemsAdded([]*core.Record{item}); err != nil {
 		t.Fatal(err)
 	}
 	if got := service.endpoints(); !slices.Equal(got, []string{"https://push.example.com/b-shopping"}) {
@@ -308,5 +309,97 @@ func TestIsPushServiceEndpoint(t *testing.T) {
 		if got := isPushServiceEndpoint(endpoint); got != want {
 			t.Errorf("isPushServiceEndpoint(%q) = %v, want %v", endpoint, got, want)
 		}
+	}
+}
+
+func TestItemsAddedTogetherShareOnePush(t *testing.T) {
+	f := newFixture(t)
+	app, err := tests.NewTestApp(f.dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	addSubscription(t, app, f.userB, "https://push.example.com/b", appShopping)
+	service := &fakePushService{}
+	registerPush(app, testConfig(false), service.send).groupDelay = 300 * time.Millisecond
+
+	lists, err := app.FindCollectionByNameOrId("lists")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := core.NewRecord(lists)
+	other.Load(map[string]any{"date": "2026-10-04", "title": "Cena", "created_by": f.userA.Id})
+	if err := app.Save(other); err != nil {
+		t.Fatal(err)
+	}
+	collection, err := app.FindCollectionByNameOrId("items")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, added := range []struct{ list, name string }{{f.list.Id, "Latte"}, {f.list.Id, "Uova"}, {other.Id, "Vino"}, {f.list.Id, "Burro"}} {
+		item := core.NewRecord(collection)
+		item.Load(map[string]any{"list": added.list, "name": added.name, "added_by": f.userA.Id})
+		if err := app.Save(item); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for len(service.endpoints()) < 2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Nothing else arrives once the groups went out.
+	time.Sleep(400 * time.Millisecond)
+
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	byList := map[string][]string{}
+	for _, push := range service.sent {
+		byList[push.payload.ListID] = append(byList[push.payload.ListID], strings.Join(push.payload.Items, ","))
+	}
+	if got := byList[f.list.Id]; !slices.Equal(got, []string{"Latte,Uova,Burro"}) {
+		t.Errorf("pushes for the list = %v, want one with Latte, Uova and Burro", got)
+	}
+	if got := byList[other.Id]; !slices.Equal(got, []string{"Vino"}) {
+		t.Errorf("pushes for the other list = %v, want one with Vino", got)
+	}
+}
+
+func TestPendingPushesGoOutWhenTheServerStops(t *testing.T) {
+	f := newFixture(t)
+	app, err := tests.NewTestApp(f.dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	addSubscription(t, app, f.userB, "https://push.example.com/b", appShopping)
+	service := &fakePushService{}
+	p := registerPush(app, testConfig(false), service.send)
+	p.groupDelay = 50 * time.Millisecond
+
+	collection, err := app.FindCollectionByNameOrId("items")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := core.NewRecord(collection)
+	item.Load(map[string]any{"list": f.list.Id, "name": "Latte", "added_by": f.userA.Id})
+	if err := app.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	// A deploy restarts the service before the group would go out.
+	if err := app.OnTerminate().Trigger(&core.TerminateEvent{App: app}); err != nil {
+		t.Fatal(err)
+	}
+	if got := service.endpoints(); !slices.Equal(got, []string{"https://push.example.com/b"}) {
+		t.Fatalf("pushed on stop to %v, want the partner", got)
+	}
+
+	// The timer of the group fires later and finds it gone.
+	time.Sleep(100 * time.Millisecond)
+	if got := len(service.endpoints()); got != 1 {
+		t.Fatalf("%d pushes after the timer, want still 1", got)
 	}
 }

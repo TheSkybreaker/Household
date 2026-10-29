@@ -1,5 +1,5 @@
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
-import { notificationText, type PushPayload } from './lib/notification';
+import { notificationItems, notificationText, type PushPayload } from './lib/notification';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -61,7 +61,7 @@ async function showItemAdded(payload: PushPayload) {
 
   // Items added in a row to the same list share one notification.
   const [previous] = await self.registration.getNotifications({ tag: payload.listId });
-  const items: string[] = [...(previous?.data?.items ?? []), payload.item];
+  const items = notificationItems(previous?.data?.items ?? [], payload);
   const { title, body } = notificationText(payload, items);
 
   const options: ShowNotificationOptions = {
