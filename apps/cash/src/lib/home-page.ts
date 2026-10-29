@@ -1,5 +1,6 @@
 import { redirect } from '@household/shared/auth';
 import { signOut } from '@household/shared/session';
+import { clearMonthCache } from './cache';
 
 export function homePage() {
   return {
@@ -8,7 +9,9 @@ export function homePage() {
 
     async logout() {
       this.logoutFailed = !(await signOut());
-      if (!this.logoutFailed) redirect('/login/');
+      if (this.logoutFailed) return;
+      clearMonthCache();
+      redirect('/login/');
     },
   };
 }

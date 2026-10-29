@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@household/shared/session', () => ({ signOut: vi.fn() }));
 vi.mock('@household/shared/auth', () => ({ redirect: vi.fn() }));
+vi.mock('./cache', () => ({ clearMonthCache: vi.fn() }));
 
 const { signOut } = await import('@household/shared/session');
 const { redirect } = await import('@household/shared/auth');
+const { clearMonthCache } = await import('./cache');
 const { homePage } = await import('./home-page');
 
 beforeEach(() => vi.clearAllMocks());
@@ -15,6 +17,7 @@ describe('logout', () => {
     const page = homePage();
     await page.logout();
     expect(redirect).toHaveBeenCalledWith('/login/');
+    expect(clearMonthCache).toHaveBeenCalled();
     expect(page.logoutFailed).toBe(false);
   });
 
@@ -23,6 +26,7 @@ describe('logout', () => {
     const page = homePage();
     await page.logout();
     expect(redirect).not.toHaveBeenCalled();
+    expect(clearMonthCache).not.toHaveBeenCalled();
     expect(page.logoutFailed).toBe(true);
   });
 });
