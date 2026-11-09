@@ -77,6 +77,11 @@ func (c config) missingVariables() []string {
 	return missing
 }
 
+// missingKeys tells whether the VAPID key pair is among what is missing, which `go run . vapid` makes.
+func (c config) missingKeys() bool {
+	return c.vapidPublicKey == "" || c.vapidPrivateKey == ""
+}
+
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -104,7 +109,11 @@ func main() {
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if missing := cfg.missingVariables(); len(missing) > 0 {
-			return fmt.Errorf("missing environment variables: %s (generate the keys with `go run . vapid`)", strings.Join(missing, ", "))
+			hint := ""
+			if cfg.missingKeys() {
+				hint = " (generate the keys with `go run . vapid`)"
+			}
+			return fmt.Errorf("missing environment variables: %s%s", strings.Join(missing, ", "), hint)
 		}
 
 		return se.Next()

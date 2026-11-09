@@ -228,3 +228,15 @@ func TestCookieDomainIsRequiredOutsideDevelopment(t *testing.T) {
 		t.Error("development, where the cookie is for localhost, asks for COOKIE_DOMAIN")
 	}
 }
+
+// The start error tells how to make the VAPID keys only when one of them is what is missing.
+func TestVapidHintOnlyForMissingKeys(t *testing.T) {
+	if testConfig(false).missingKeys() {
+		t.Error("only COOKIE_DOMAIN is missing and the keys count as missing")
+	}
+	noKey := testConfig(true)
+	noKey.vapidPrivateKey = ""
+	if !noKey.missingKeys() {
+		t.Error("the private key is missing and the keys do not count as missing")
+	}
+}
