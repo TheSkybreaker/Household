@@ -123,9 +123,10 @@ export function monthPage() {
       const slices: PieSlice[] = this.summary ? this.summary.pie[this.pieRange] : [];
       return pieArcs(slices, this.pieSelected);
     },
-    // The server's day while online, so a phone ahead of APP_TZ cannot date a movement in the future.
+    // The server's day, so a phone ahead of APP_TZ cannot date a movement in the future; the phone's
+    // once it is another day there than at the last answer.
     get today(): string {
-      return this.serverToday || deviceToday();
+      return this.serverToday && this.loadedOn === deviceToday() ? this.serverToday : deviceToday();
     },
     // Alpine cannot repeat elements inside an <svg>, so the ring is markup; a tap on a slice
     // reaches pieTap through data-envelope.
@@ -249,6 +250,7 @@ export function monthPage() {
       if (!this.summary) return;
       this.editing = null;
       this.forms++;
+      this.formLoads++;
       this.form = newForm(newRecordId(), kind, envelopeId, this.summary.month, this.today, this.meId, this.envelopes);
       this.formSummary = this.summary;
       this.formError = null;
@@ -261,6 +263,7 @@ export function monthPage() {
       if (!movement) return;
       this.editing = movement;
       this.forms++;
+      this.formLoads++;
       this.form = editForm(movement);
       this.formSummary = this.summary;
       this.formError = null;
@@ -288,8 +291,9 @@ export function monthPage() {
       // The day of the shopping, which may be yesterday and even last month.
       this.form.date = this.shortcut.date;
       this.shortcut = null;
+      const form = this.forms;
       await this.dateChanged();
-      if (this.form) this.form.envelope = this.formEnvelopes.find((envelope) => envelope.name === 'Spesa')?.id ?? this.form.envelope;
+      if (this.form && form === this.forms) this.form.envelope = this.formEnvelopes.find((envelope) => envelope.name === 'Spesa')?.id ?? this.form.envelope;
     },
     setKind(kind: 'spend' | 'extra') {
       if (!this.form || this.form.kind === kind) return;
@@ -344,7 +348,8 @@ export function monthPage() {
           if (refused !== 'saved') {
             if (refused) this.formError = refused;
             else toast().show('Non salvato, riprova');
-            // An envelope gone meanwhile leaves the chips once the form's month is read again.
+            // An envelope gone meanwhile: the month on screen and then the form's month are read again,
+            // which drops its chip.
             if (refused === 'envelope') {
               await this.reload();
               this.formSummary = null;
