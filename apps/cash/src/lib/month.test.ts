@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayKind, monthNav, movementRows, paidOnFor, panelState } from './month';
+import { dayKind, monthNav, movementRows, paidOnFor, panelState, sweepBreakdown } from './month';
 import type { CashSummary, EnvelopeSummary, Movement, QuotaSummary } from './types';
 
 const me = 'usera';
@@ -8,6 +8,7 @@ const envelope = (id: string, name: string, slot: number, kind: 'spend' | 'save'
   ({ id, name, slot, kind }) as EnvelopeSummary;
 const envelopes = [envelope('casa', 'Casa', 1), envelope('spesa', 'Spesa', 2), envelope('fondo', 'Fondo emergenza', 3, 'save')];
 const quota = (user: string, paidOn = ''): QuotaSummary => ({ id: `q-${user}`, user, amount: user === me ? 100000 : 90000, paidOn });
+const zeroQuota = (user: string, paidOn = ''): QuotaSummary => ({ ...quota(user, paidOn), amount: 0 });
 
 function summary(overrides: Partial<CashSummary>): CashSummary {
   return {
@@ -63,6 +64,23 @@ describe('panelState', () => {
     const paid = panelState(summary({ quotas: [quota(partner, '2026-10-02'), quota(me, '2026-10-01')] }), me).people;
     expect(paid.map((person) => [person.userId, person.status, person.canUnpay])).toEqual([[me, 'paid', true], [partner, 'paid', false]]);
   });
+
+  it('asks for the quotas while both are still 0', () => {
+    const state = panelState(summary({ quotas: [zeroQuota(me), zeroQuota(partner)], expected: 0, entered: 0, extras: 0, incoming: 0 }), me);
+    expect(state.note).toEqual({ kind: 'unset' });
+    expect(state.people.map((person) => [person.status, person.canUnpay])).toEqual([['none', false], ['none', false]]);
+  });
+
+  it('counts a quota of 0 as nothing to pay', () => {
+    const state = panelState(summary({ quotas: [zeroQuota(me), quota(partner)], incoming: 90000 }), me);
+    expect(state.note).toMatchObject({ kind: 'incoming', whose: 'other', userId: partner });
+    expect(state.people[0].status).toBe('none');
+  });
+
+  it('closes a past month with quotas of 0 on what was left', () => {
+    const state = panelState(summary({ month: '2026-09', quotas: [zeroQuota(me), zeroQuota(partner)], incoming: 0, left: 0 }), me);
+    expect(state.note).toEqual({ kind: 'leftAtEnd' });
+  });
 });
 
 describe('movementRows', () => {
@@ -90,6 +108,10 @@ describe('movementRows', () => {
     expect(days[0].rows.map((row) => [row.kind, row.amount])).toEqual([['sweep', 9710], ['spend', -1000]]);
   });
 
+  it('leaves out a quota of 0, even marked as paid', () => {
+    expect(movementRows(summary({ quotas: [zeroQuota(me, '2026-10-01')] }), [])).toEqual([]);
+  });
+
   it('keeps a movement of an envelope the month no longer lists', () => {
     const [day] = movementRows(summary({ envelopes: [] }), [movement('old', {})]);
     expect(day.rows[0].envelope).toBeNull();
@@ -107,5 +129,15 @@ describe('dates', () => {
     expect(dayKind('2026-10-28', '2026-10-29')).toBe('yesterday');
     expect(dayKind('2026-09-30', '2026-10-01')).toBe('yesterday');
     expect(dayKind('2026-10-20', '2026-10-29')).toBe('other');
+  });
+});
+
+describe('sweepBreakdown', () => {
+  it('lists what each spend envelope gave to the fund, or took from it, at the close', () => {
+    const september = summary({ month: '2026-09', closed: true, sweep: 9710 });
+    const sweep = (id: string, from: string, to: string, amount: number) =>
+      movement(id, { kind: 'transfer', reason: 'sweep', date: '2026-09-30', month: '2026-09', envelope: '', from_envelope: from, to_envelope: to, amount });
+    const lines = sweepBreakdown(september, [sweep('s1', 'casa', 'fondo', 6210), sweep('s2', 'fondo', 'spesa', 2500), movement('fun', {})]);
+    expect(lines.map((line) => [line.envelope?.id, line.amount])).toEqual([['casa', 6210], ['spesa', -2500]]);
   });
 });

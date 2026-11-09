@@ -4,6 +4,7 @@ import { appLinks } from '@household/shared/apps';
 import { checkSession, guardPage, isRedirecting, loginPage } from '@household/shared/auth';
 import { clearMonthCache } from './cache';
 import { homePage } from './home-page';
+import { monthPage } from './month-page';
 import { registerStores } from './stores';
 
 // Entrypoint of @astrojs/alpinejs: runs on every page before Alpine starts.
@@ -13,6 +14,7 @@ export default (Alpine: Alpine) => {
 
   Alpine.data('loginPage', loginPage);
   Alpine.data('homePage', homePage);
+  Alpine.data('monthPage', monthPage);
   Alpine.data('appLinks', appLinks);
 
   const isLoginPage = document.body.dataset.page === 'login';

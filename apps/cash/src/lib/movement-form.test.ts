@@ -79,7 +79,9 @@ describe('shoppingShortcut', () => {
 
   it('offers a list of today or yesterday with everything taken and no movement yet', () => {
     const shortcut = shoppingShortcut([list('l1', '2026-10-28'), list('l2', '2026-10-29', 'Lidl')], [item('l1', true), item('l2', true), item('l2', true)], [], '2026-10-29');
-    expect(shortcut).toEqual({ listId: 'l2', title: 'Lidl' });
+    expect(shortcut).toEqual({ listId: 'l2', title: 'Lidl', date: '2026-10-29' });
+    const yesterday = shoppingShortcut([list('l1', '2026-10-28')], [item('l1', true)], [], '2026-10-29');
+    expect(yesterday).toEqual({ listId: 'l1', title: 'Esselunga', date: '2026-10-28' });
   });
 
   it('ignores lists with items to buy, older lists, empty lists and lists already linked', () => {

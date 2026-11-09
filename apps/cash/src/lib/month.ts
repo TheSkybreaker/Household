@@ -28,6 +28,8 @@ export function monthNav(summary: CashSummary) {
 export type PanelNote =
   | { kind: 'incoming'; amount: number; whose: 'both' | 'mine' | 'other'; userId: string }
   | { kind: 'allPaid' }
+  // Both quotas are still 0, as in the first month before the Divisione sets them.
+  | { kind: 'unset' }
   | { kind: 'leftAtEnd' }
   | { kind: 'overspent' };
 
@@ -36,17 +38,20 @@ export interface PanelPerson {
   quotaId: string;
   amount: number;
   paidOn: string;
-  // The server lets each person mark only their own quota, as paid or not.
-  status: 'paid' | 'payable' | 'waiting';
+  // The server lets each person mark only their own quota, as paid or not. A quota of 0 has nothing
+  // to pay, so no status.
+  status: 'paid' | 'payable' | 'waiting' | 'none';
   canUnpay: boolean;
 }
 
 // What the mint panel of the Mese tab shows, me first among the people.
 export function panelState(summary: CashSummary, meId: string) {
   const past = summary.month !== summary.current;
-  const unpaid = summary.quotas.filter((quota) => !quota.paidOn);
+  const unpaid = summary.quotas.filter((quota) => quota.amount > 0 && !quota.paidOn);
   let note: PanelNote;
-  if (summary.incoming > 0) {
+  if (!past && summary.quotas.every((quota) => quota.amount === 0)) {
+    note = { kind: 'unset' };
+  } else if (summary.incoming > 0) {
     const whose = unpaid.length > 1 ? 'both' : unpaid[0]?.user === meId ? 'mine' : 'other';
     note = { kind: 'incoming', amount: summary.incoming, whose, userId: unpaid[0]?.user ?? '' };
   } else if (!past) {
@@ -62,8 +67,8 @@ export function panelState(summary: CashSummary, meId: string) {
       quotaId: quota.id,
       amount: quota.amount,
       paidOn: quota.paidOn,
-      status: quota.paidOn ? 'paid' : quota.user === meId ? 'payable' : 'waiting',
-      canUnpay: Boolean(quota.paidOn) && quota.user === meId,
+      status: quota.amount === 0 ? 'none' : quota.paidOn ? 'paid' : quota.user === meId ? 'payable' : 'waiting',
+      canUnpay: quota.amount > 0 && Boolean(quota.paidOn) && quota.user === meId,
     }));
 
   const { entered, spent } = summary;
@@ -136,7 +141,7 @@ export function movementRows(summary: CashSummary, movements: Movement[]): { day
     ranked.push({ row, rank: 1, created: movement.created });
   }
   for (const quota of summary.quotas) {
-    if (!quota.paidOn) continue;
+    if (!quota.paidOn || quota.amount === 0) continue;
     ranked.push({ row: { ...base, id: `quota-${quota.id}`, kind: 'quota', amount: quota.amount, date: quota.paidOn, userId: quota.user, quotaId: quota.id }, rank: 2, created: '' });
   }
 
@@ -148,6 +153,18 @@ export function movementRows(summary: CashSummary, movements: Movement[]): { day
     else days.push({ day: row.date, rows: [row] });
   }
   return days;
+}
+
+// What each spend envelope gave to the avanzo envelope at the close (positive) or took from it
+// (negative): the transfers written then, which later edits to the month do not change.
+export function sweepBreakdown(summary: CashSummary, movements: Movement[]): { envelope: EnvelopeRef | null; amount: number }[] {
+  return movements
+    .filter((movement) => movement.reason === 'sweep')
+    .map((movement) =>
+      movement.to_envelope === summary.sweepTo
+        ? { envelope: envelopeOf(summary, movement.from_envelope), amount: movement.amount }
+        : { envelope: envelopeOf(summary, movement.to_envelope), amount: -movement.amount },
+    );
 }
 
 // The day a quota is marked as paid: today in the current month, the first day of a past one.

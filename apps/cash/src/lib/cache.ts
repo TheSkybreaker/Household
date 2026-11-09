@@ -1,9 +1,11 @@
+import type { User } from '@household/shared/pb';
 import type { MonthData } from './types';
 
 // The months Conti showed, so it opens without network in read only mode.
 const PREFIX = 'cash:';
 const LAST_MONTH_KEY = `${PREFIX}last-month`;
 const monthKey = (month: string) => `${PREFIX}month:${month}`;
+const USERS_KEY = `${PREFIX}users`;
 
 export function saveMonthCache(data: MonthData) {
   try {
@@ -21,6 +23,23 @@ export function restoreMonthCache(month?: string): MonthData | null {
     return wanted ? JSON.parse(localStorage.getItem(monthKey(wanted)) ?? 'null') : null;
   } catch {
     return null;
+  }
+}
+
+// Names and colours of the two people, for the panel and the movements offline.
+export function saveUsers(users: User[]) {
+  try {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  } catch {
+    // Without storage the app still works online.
+  }
+}
+
+export function restoreUsers(): User[] {
+  try {
+    return JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]');
+  } catch {
+    return [];
   }
 }
 

@@ -6,6 +6,9 @@
   --btn: #0C7F66; --btn-ink: #FFFFFF;
   --in-soft: #E9E6FB; --in-text: #4F42B5;
   --danger: #C23B34; --ring: #0B7A62;
+  /* Envelope colours by slot, checked for colour blindness in this order: never reorder them. */
+  --e1: #14967A; --e2: #EB6834; --e3: #4A3AA7; --e4: #E87BA4; --e5: #2A78D6; --e6: #E34948;
+  --hl: #FFF0C2; --on-ink: #7FE0C4;
   --person-sky: #1677C9; --person-sky-ink: #FFFFFF; --person-sun: #F7B500; --person-sun-ink: #3D2C00;
   --app-shopping: #3AA6E8; --app-shopping-ink: #06283F;
   --shadow: 0 1px 0 rgba(14, 53, 48, .05), 0 10px 26px -16px rgba(14, 53, 48, .35);
@@ -20,6 +23,8 @@
     --btn: #34C7A0; --btn-ink: #03231B;
     --in-soft: #231F45; --in-text: #B9B1F5;
     --danger: #FF8A80; --ring: #6FDDBE;
+    --e1: #22A884; --e2: #D95926; --e3: #9085E9; --e4: #D55181; --e5: #3987E5; --e6: #E66767;
+    --hl: #3A3010; --on-ink: #0C7F66;
     --person-sky: #3AA6E8; --person-sky-ink: #04192A; --person-sun: #F7C23A; --person-sun-ink: #2B1F00;
     --app-shopping: #2F95D4; --app-shopping-ink: #04192A;
     --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 28px -16px rgba(0, 0, 0, .8);

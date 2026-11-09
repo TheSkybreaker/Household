@@ -1,56 +1,43 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const show = vi.fn();
 vi.mock('./toast', () => ({ toast: () => ({ show }) }));
-
-const listeners: (() => void)[] = [];
-const fakeDocument = { visibilityState: 'visible', addEventListener: (_: string, listener: () => void) => listeners.push(listener) };
-vi.stubGlobal('document', fakeDocument);
 const { undoable } = await import('./undo');
 
-const steps = () => ({ hide: vi.fn(), restore: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) });
-const annulla = () => (show.mock.calls.at(-1)?.[1] as { run: () => void }).run();
+const steps = () => ({ run: vi.fn().mockResolvedValue(undefined), undo: vi.fn().mockResolvedValue(undefined) });
+const lastAction = () => show.mock.calls.at(-1)?.[1] as { run: () => void } | undefined;
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  show.mockClear();
-  fakeDocument.visibilityState = 'visible';
-});
-afterEach(() => vi.useRealTimers());
+beforeEach(() => show.mockClear());
 
 describe('undoable', () => {
-  it('hides at once and commits after 5 s', async () => {
+  it('runs at once and offers Annulla for 5 s', async () => {
     const action = steps();
-    undoable('Eliminato', action);
-    expect(action.hide).toHaveBeenCalled();
-    expect(action.commit).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(action.commit).toHaveBeenCalledTimes(1);
+    await undoable('Eliminato', action);
+    expect(action.run).toHaveBeenCalledTimes(1);
+    expect(lastAction()).toBeDefined();
+    expect(show.mock.calls.at(-1)?.[2]).toBe(5000);
+    expect(action.undo).not.toHaveBeenCalled();
   });
 
-  it('restores on Annulla and never commits', async () => {
+  it('undoes on Annulla', async () => {
     const action = steps();
-    undoable('Eliminato', action);
-    annulla();
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(action.restore).toHaveBeenCalledTimes(1);
-    expect(action.commit).not.toHaveBeenCalled();
+    await undoable('Eliminato', action);
+    lastAction()?.run();
+    await vi.waitFor(() => expect(action.undo).toHaveBeenCalledTimes(1));
   });
 
-  it('commits when the page is hidden, once', async () => {
-    const action = steps();
-    undoable('Eliminato', action);
-    fakeDocument.visibilityState = 'hidden';
-    listeners.forEach((listener) => listener());
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(action.commit).toHaveBeenCalledTimes(1);
+  it('offers no Annulla when the action fails', async () => {
+    const action = { ...steps(), run: vi.fn().mockRejectedValue(new Error('offline')) };
+    await undoable('Eliminato', action);
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(lastAction()).toBeUndefined();
   });
 
-  it('restores and says so when the commit fails', async () => {
-    const action = { ...steps(), commit: vi.fn().mockRejectedValue(new Error('offline')) };
-    undoable('Eliminato', action);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(action.restore).toHaveBeenCalledTimes(1);
-    expect(show).toHaveBeenLastCalledWith('Non salvato, riprova');
+  it('says so when Annulla fails', async () => {
+    const action = { ...steps(), undo: vi.fn().mockRejectedValue(new Error('offline')) };
+    await undoable('Eliminato', action);
+    lastAction()?.run();
+    await vi.waitFor(() => expect(show).toHaveBeenCalledTimes(2));
+    expect(lastAction()).toBeUndefined();
   });
 });

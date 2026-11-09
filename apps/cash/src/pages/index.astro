@@ -2,12 +2,13 @@
 import AppLinks from '@household/shared/components/AppLinks.astro';
 import Avatar from '@household/shared/components/Avatar.astro';
 import Sheet from '@household/shared/components/Sheet.astro';
+import Toast from '@household/shared/components/Toast.astro';
 import Icon from '../components/Icon.astro';
 import Page from '../components/Page.astro';
 ---
 
 <Page page="home">
-  <div class="app" x-data="homePage" x-cloak>
+  <div class="app" x-data="monthPage" x-cloak>
     <header class="top">
       <div class="brand"><span class="brand-mark"><Icon name="coins" /></span><span>Conti</span></div>
       <div class="top-actions">
@@ -17,7 +18,205 @@ import Page from '../components/Page.astro';
       </div>
     </header>
 
+    <template x-if="summary">
+      <div>
+        <nav class="month-nav" aria-label="Mese">
+          <button type="button" class="icon-btn" aria-label="Mese precedente" :disabled="!nav.canPrev" @click="go(nav.prev)"><Icon name="prev" /></button>
+          <h1 x-html="`${monthTitle(nav.month)}<span>${nav.current ? 'mese in corso' : yearOf(nav.month)}</span>`"></h1>
+          <button type="button" class="icon-btn" aria-label="Mese successivo" :disabled="!nav.canNext" @click="go(nav.next)"><Icon name="next" /></button>
+        </nav>
+
+        <section class="panel" :aria-label="`Cassa di ${monthName(nav.month)}`">
+          <p class="panel-label" x-text="`${panel.past ? 'Rimasti a ' : 'Rimasti nella cassa a '}${monthName(nav.month)}`"></p>
+          <div class="hero"><span x-text="heroUnits(panel.left)"></span><small x-text="heroRest(panel.left)"></small></div>
+          <p class="panel-sub" x-text="panelNote()"></p>
+          <div class="meter" role="img" :aria-label="`Speso il ${Math.round(panel.meterPercent)}% di quanto è entrato`"><i :style="`width:${panel.meterPercent.toFixed(1)}%`"></i></div>
+          <div class="stats">
+            <div><span>Entrati</span><b x-text="euro(panel.entered)"></b><small x-text="panel.extras ? `di cui ${euroRound(panel.extras)} extra` : `di ${euroRound(panel.expected)} previsti`"></small></div>
+            <div><span>Spesi</span><b x-text="euro(panel.spent)"></b><small x-text="panel.spentPercent !== null ? `${panel.spentPercent}% di quanto è entrato` : 'non è ancora entrato niente'"></small></div>
+          </div>
+          <ul class="people">
+            <template x-for="person in panel.people" :key="person.userId">
+              <li>
+                <span class="av sm" :class="avatarClass(person.userId)" aria-hidden="true" x-text="initialOf(person.userId)"></span>
+                <span><b x-text="personLabel(person.userId)"></b><span class="amt num" x-text="`${euro(person.amount)} al mese`"></span></span>
+                <template x-if="person.status === 'paid'">
+                  <span class="st done"><Icon name="check" /><span x-text="`Versato il ${dayShort(person.paidOn)}`"></span></span>
+                </template>
+                <button x-show="person.status === 'payable'" type="button" class="st go" :disabled="!online" @click="pay()">Segna come versato</button>
+                <span x-show="person.status === 'waiting'" class="st wait">Da versare</span>
+              </li>
+            </template>
+          </ul>
+        </section>
+
+        <section class="sec">
+          <div class="sec-h"><h2>Spese per busta</h2></div>
+          <p class="sec-sub" x-show="pie.total" x-text="`${euro(pie.total)} spesi ${pieRange === 'all' ? `da ${monthName(summary.first)} a oggi` : `a ${monthName(nav.month)}`}. Tocca una fetta o una riga per i dettagli.`"></p>
+          <div class="card pie">
+            <div class="seg mini" role="radiogroup" aria-label="Periodo">
+              <button type="button" role="radio" :aria-checked="pieRange === 'month'" @click="pieRange = 'month'; pieSelected = null" x-text="monthTitle(nav.month)"></button>
+              <button type="button" role="radio" :aria-checked="pieRange === 'all'" @click="pieRange = 'all'; pieSelected = null" x-text="`Da ${monthName(summary.first)} a oggi`"></button>
+            </div>
+            <div class="empty" style="margin-top:8px" x-show="!pie.total"><p>Nessuna spesa in questo periodo.</p></div>
+            <template x-if="pie.total">
+              <div>
+                <div class="pie-wrap">
+                  <svg viewBox="0 0 208 208" role="img" :aria-label="pie.arcs.map((arc) => `${arc.name} ${euro(arc.amount)}, ${arc.percent}%`).join('; ')" x-html="pieSvg" @click="pieTap($event)"></svg>
+                </div>
+                <ul class="pie-l" :class="{ 'has-sel': pieSelected }">
+                  <template x-for="arc in pie.arcs" :key="arc.envelope">
+                    <li>
+                      <button type="button" :aria-pressed="pieSelected === arc.envelope" @click="pieSelected = pieSelected === arc.envelope ? null : arc.envelope">
+                        <i class="dot" :style="`background:${color(arc)}`"></i><span class="n" x-text="arc.name"></span><span class="a" x-text="euro(arc.amount)"></span><span class="p" x-text="`${arc.percent}%`"></span>
+                      </button>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div class="sec-h"><h2>Movimenti</h2></div>
+          <div class="empty" x-show="!days.length"><p x-text="`Ancora nessun movimento a ${monthName(nav.month)}.`"></p></div>
+          <template x-for="day in days" :key="day.day">
+            <div>
+              <h3 class="day-h" x-text="dayLabel(day.day)"></h3>
+              <ul class="mvs">
+                <template x-for="row in day.rows" :key="row.id">
+                  <li>
+                    <button type="button" class="mv" :class="{ 'is-fresh': fresh === row.id }" @click="open(row)">
+                      <span class="mv-ico" :class="{ in: rowIsIn(row) }">
+                        <template x-if="row.kind === 'spend'"><i class="dot" :style="`background:${color(row.envelope)}`"></i></template>
+                        <span x-show="row.kind === 'quota'" style="display:contents"><Icon name="income" /></span>
+                        <span x-show="row.kind === 'extra'" style="display:contents"><Icon name="gift" /></span>
+                        <span x-show="row.kind === 'transfer' || row.kind === 'sweep'" style="display:contents"><Icon name="swap" /></span>
+                      </span>
+                      <span class="mv-main">
+                        <span class="mv-desc" x-text="rowTitle(row)"></span>
+                        <span class="mv-meta">
+                          <template x-if="rowShowsPerson(row)"><span class="av xs" :class="avatarClass(row.userId)" aria-hidden="true" x-text="initialOf(row.userId)"></span></template>
+                          <span x-text="rowMeta(row)"></span>
+                        </span>
+                      </span>
+                      <span class="mv-amt" :class="{ in: rowIsIn(row) }" x-text="rowAmount(row)"></span>
+                    </button>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </template>
+        </section>
+      </div>
+    </template>
+
+    <div class="fab-wrap">
+      <div class="fab-in">
+        <button type="button" class="fab" :disabled="!online || !summary" @click="openAdd('spend')"><Icon name="plus" /><span>Aggiungi</span></button>
+      </div>
+    </div>
+
     <div class="backdrop" :class="{ 'is-on': sheet }" @click="sheet = null"></div>
+
+    <Sheet open="sheet === 'add'" close="sheet = null" label="Nuovo movimento">
+      <template x-if="form">
+        <form @submit.prevent="saveForm()" novalidate>
+          <h2 class="sh-title" tabindex="-1" autofocus x-text="editing ? (form.kind === 'spend' ? 'Modifica spesa' : 'Modifica versamento') : form.kind === 'spend' ? 'Nuova spesa' : 'Versamento extra'"></h2>
+          <div class="seg" role="radiogroup" aria-label="Tipo di movimento" x-show="!editing">
+            <button type="button" role="radio" :aria-checked="form.kind === 'spend'" @click="setKind('spend')">Spesa</button>
+            <button type="button" role="radio" :aria-checked="form.kind === 'extra'" @click="setKind('extra')">Versamento extra</button>
+          </div>
+          <label class="amount"><span class="visually-hidden">Importo in euro</span><input x-ref="amount" inputmode="decimal" autocomplete="off" placeholder="0,00" x-model="form.amount" @input="formError = formError === 'amount' ? null : formError" /><span class="cur" aria-hidden="true">€</span></label>
+          <p class="err" role="alert" x-show="formError === 'amount'">Scrivi un importo, per esempio 12,50.</p>
+          <template x-if="shortcut && form.kind === 'spend' && !form.description">
+            <button type="button" class="link-card" @click="useShortcut(); $refs.amount.focus()"><Icon name="basket" /><span><b x-text="shortcutTitle"></b>Lista completata nella Spesa, ancora senza importo</span><em>Usa</em></button>
+          </template>
+          <label class="field">Descrizione<input maxlength="40" :placeholder="form.kind === 'spend' ? 'Es. Esselunga, bolletta luce' : 'Es. Premio di produzione, tredicesima'" x-model="form.description" /></label>
+          <template x-if="form.kind === 'extra'">
+            <div>
+              <div class="flabel" id="lWho">Di chi sono</div>
+              <div class="who" role="radiogroup" aria-labelledby="lWho">
+                <button type="button" role="radio" :aria-checked="form.user === meId" @click="form.user = meId"><span class="av xs" :class="avatarClass(meId)" aria-hidden="true" x-text="initialOf(meId)"></span><span>Miei</span></button>
+                <button type="button" role="radio" :aria-checked="form.user === partnerId()" @click="form.user = partnerId()"><span class="av xs" :class="avatarClass(partnerId())" aria-hidden="true" x-text="initialOf(partnerId())"></span><span x-text="`Di ${nameOf(partnerId())}`"></span></button>
+              </div>
+            </div>
+          </template>
+          <div class="flabel" id="lEnv" x-text="form.kind === 'spend' ? 'Da quale busta' : 'In quale busta'"></div>
+          <div class="env-chips" role="radiogroup" aria-labelledby="lEnv">
+            <template x-for="envelope in formEnvelopes" :key="envelope.id">
+              <button type="button" role="radio" class="env-chip" :aria-checked="form.envelope === envelope.id" @click="form.envelope = envelope.id; formError = null"><i class="dot" :style="`background:${color(envelope)}`"></i><span x-text="envelope.name"></span></button>
+            </template>
+          </div>
+          <p class="hint" x-show="!formEnvelopes.length">Ancora nessuna busta: le create dalla Divisione.</p>
+          <p class="err" role="alert" x-show="formError === 'envelope'" x-text="form.kind === 'spend' ? 'Scegli da quale busta.' : 'Scegli in quale busta.'"></p>
+          <p class="preview" x-show="formEnvelopes.length" x-html="previewText"></p>
+          <label class="field">Data<input type="date" x-model="form.date" :min="`${summary?.first}-01`" :max="todayIso" @change="dateChanged()" /></label>
+          <button type="submit" class="btn primary wide save" :disabled="saving || !online || !formEnvelopes.length" x-text="editing ? 'Salva' : form.kind === 'spend' ? 'Aggiungi spesa' : 'Aggiungi versamento'"></button>
+        </form>
+      </template>
+    </Sheet>
+
+    <Sheet open="sheet === 'movement'" close="sheet = null" label="Dettaglio del movimento">
+      <template x-if="openRow && openRow.kind !== 'sweep'">
+        <div>
+          <h2 class="sh-title" tabindex="-1" autofocus x-text="rowTitle(openRow)"></h2>
+          <div class="detail-amt num" x-text="rowAmount(openRow)"></div>
+          <dl class="dl">
+            <template x-if="openRow.kind === 'quota'">
+              <div style="display:contents">
+                <dt>Di</dt><dd><span class="av xs" :class="avatarClass(openRow.userId)" aria-hidden="true" x-text="initialOf(openRow.userId)"></span><span x-text="openRow.userId === meId ? 'te' : nameOf(openRow.userId)"></span></dd>
+                <dt>Versato il</dt><dd x-text="dayLabel(openRow.date)"></dd>
+                <dt>Tipo</dt><dd>Quota mensile</dd>
+              </div>
+            </template>
+            <template x-if="openRow.kind === 'extra'">
+              <div style="display:contents">
+                <dt>Di</dt><dd><span class="av xs" :class="avatarClass(openRow.userId)" aria-hidden="true" x-text="initialOf(openRow.userId)"></span><span x-text="openRow.userId === meId ? 'te' : nameOf(openRow.userId)"></span></dd>
+                <dt>Nella busta</dt><dd><i class="dot" :style="`background:${color(openRow.envelope)}`"></i><span x-text="openRow.envelope?.name ?? 'busta eliminata'"></span></dd>
+                <dt>Data</dt><dd x-text="dayLabel(openRow.date)"></dd>
+              </div>
+            </template>
+            <template x-if="openRow.kind === 'spend'">
+              <div style="display:contents">
+                <dt>Dalla busta</dt><dd><i class="dot" :style="`background:${color(openRow.envelope)}`"></i><span x-text="openRow.envelope?.name ?? 'busta eliminata'"></span></dd>
+                <dt>Registrata da</dt><dd><span class="av xs" :class="avatarClass(openRow.userId)" aria-hidden="true" x-text="initialOf(openRow.userId)"></span><span x-text="openRow.userId === meId ? 'te' : nameOf(openRow.userId)"></span></dd>
+                <dt>Data</dt><dd x-text="dayLabel(openRow.date)"></dd>
+              </div>
+            </template>
+            <template x-if="openRow.kind === 'transfer'">
+              <div style="display:contents">
+                <dt>Da</dt><dd><i class="dot" :style="`background:${color(openRow.from)}`"></i><span x-text="openRow.from?.name ?? 'busta'"></span></dd>
+                <dt>A</dt><dd><i class="dot" :style="`background:${color(openRow.to)}`"></i><span x-text="openRow.to?.name ?? 'busta'"></span></dd>
+                <dt>Data</dt><dd x-text="dayLabel(openRow.date)"></dd>
+              </div>
+            </template>
+          </dl>
+          <p class="hint" x-show="openRow.kind === 'transfer'" x-text="`Fa parte dell'eliminazione della busta ${openRow.from?.name ?? ''}.`"></p>
+          <div class="menu">
+            <button type="button" class="menu-act" x-show="openRow.kind === 'spend' || openRow.kind === 'extra'" :disabled="!online" @click="openEdit()">Modifica</button>
+            <button type="button" class="menu-act danger" :class="{ 'is-armed': armed }" x-show="openRow.kind === 'spend' || openRow.kind === 'extra' || canUnpay(openRow)" :disabled="!online" @click="removeOpenRow()" x-text="armed ? 'Tocca di nuovo per confermare' : openRow.kind === 'quota' ? 'Segna come non versato' : 'Elimina il movimento'"></button>
+          </div>
+        </div>
+      </template>
+    </Sheet>
+
+    <Sheet open="sheet === 'sweep'" close="sheet = null" label="Avanzo del mese">
+      <template x-if="openRow?.kind === 'sweep' && summary">
+        <div>
+          <h2 class="sh-title" tabindex="-1" autofocus x-text="rowTitle(openRow)"></h2>
+          <div class="detail-amt num" x-text="signed(openRow.amount)"></div>
+          <p class="sh-sub" x-text="`${openRow.amount > 0 ? 'Quello che è avanzato nelle buste di spesa' : 'Quanto le buste di spesa sono andate oltre'} a ${monthName(summary.month)}, ${openRow.amount > 0 ? 'spostato nel' : 'preso dal'} ${sweepToName} il ${dayShort(openRow.date)}.`"></p>
+          <ul class="mini-l">
+            <template x-for="line in sweepLines" :key="line.envelope?.id">
+              <li><span><i class="dot" :style="`background:${color(line.envelope)};margin-right:8px`"></i><span x-text="line.envelope?.name ?? 'busta'"></span></span><span x-text="signed(line.amount)"></span></li>
+            </template>
+          </ul>
+          <p class="hint" x-text="`Calcolato alla chiusura del mese: se ora modifichi le spese di ${monthName(summary.month)}, l'avanzo resta questo.`"></p>
+        </div>
+      </template>
+    </Sheet>
 
     <Sheet open="sheet === 'profile'" close="sheet = null" label="Profilo">
       <div class="sh-head">
@@ -32,5 +231,7 @@ import Page from '../components/Page.astro';
       <button type="button" class="btn ghost wide" :disabled="!$store.session.online" @click="logout()">Esci</button>
       <p class="hint" role="alert" x-show="logoutFailed">Non salvato, riprova</p>
     </Sheet>
+
+    <Toast />
   </div>
 </Page>

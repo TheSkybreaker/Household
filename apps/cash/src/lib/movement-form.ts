@@ -97,7 +97,7 @@ export function shoppingShortcut(
   items: { list: string; checked: boolean }[],
   movements: { shopping_list: string }[],
   today: string,
-): { listId: string; title: string } | null {
+): { listId: string; title: string; date: string } | null {
   const yesterday = toIsoDate(addDays(fromIsoDate(today), -1));
   const linked = new Set(movements.map((movement) => movement.shopping_list));
   const done = lists
@@ -107,5 +107,5 @@ export function shoppingShortcut(
       return own.length > 0 && own.every((item) => item.checked);
     })
     .sort((a, b) => b.date.localeCompare(a.date) || b.created.localeCompare(a.created));
-  return done[0] ? { listId: done[0].id, title: done[0].title } : null;
+  return done[0] ? { listId: done[0].id, title: done[0].title, date: done[0].date } : null;
 }
