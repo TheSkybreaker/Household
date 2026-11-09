@@ -12,7 +12,7 @@ const zeroQuota = (user: string, paidOn = ''): QuotaSummary => ({ ...quota(user,
 
 function summary(overrides: Partial<CashSummary>): CashSummary {
   return {
-    month: '2026-10', current: '2026-10', first: '2026-09', closed: false, sweepTo: 'fondo', sweep: 0,
+    month: '2026-10', current: '2026-10', today: '2026-10-29', first: '2026-09', closed: false, sweepTo: 'fondo', sweep: 0,
     quotas: [quota(partner), quota(me, '2026-10-01')], expected: 190000, entered: 150000, extras: 50000, spent: 154000,
     left: -4000, incoming: 90000, cash: 337710, envelopes, pie: { month: [], all: [] }, savings: { months: [], series: [] },
     ...overrides,

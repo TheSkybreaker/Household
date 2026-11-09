@@ -69,6 +69,9 @@ input { font: inherit; color: inherit }
 .tile-shopping { background: var(--app-shopping); color: var(--app-shopping-ink) }
 .tile-cash { background: var(--app-cash); color: var(--app-cash-ink) }
 
+/* offline, while writes wait for the network */
+.offline { margin: 0 0 16px; padding: 12px 16px; border-radius: 16px; background: var(--accent-soft); color: var(--ink); font-size: 15px; font-weight: 700 }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important }
 }

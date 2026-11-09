@@ -220,7 +220,7 @@ Tutti i numeri si calcolano sul server con query aggregate, in un'unica route di
 
 | Metodo e percorso | Cosa fa |
 | --- | --- |
-| GET /api/cash/summary?month= | Riepilogo del mese: quote, entrati, spesi, rimasti, in arrivo, buste con i loro numeri, avanzo previsto o effettivo, torta per busta del mese e dall'inizio, serie dei risparmi dall'inizio al mese in corso |
+| GET /api/cash/summary?month= | Riepilogo del mese: quote, entrati, spesi, rimasti, in arrivo, buste con i loro numeri, avanzo previsto o effettivo, torta per busta del mese e dall'inizio, serie dei risparmi dall'inizio al mese in corso, e il giorno di oggi in `APP_TZ`, che le app usano al posto della data del telefono |
 | POST /api/cash/envelopes | Crea una busta `{ name, kind, amount, goal, opening_balance }` e la sua allocazione nel mese in corso, nello slot libero più basso. Rifiuta oltre 6 buste attive |
 | POST /api/cash/envelopes/{id}/archive | Archivia con `{ to }`: sposta allocazione e movimenti del mese in corso nella busta `to`, crea un `transfer` con `reason = archive` di quello che resta nella busta (il saldo di una busta di risparmio, o un trasferimento ricevuto nel mese), sposta la busta dell'avanzo se era questa, imposta `archived_from` al mese in corso. Rifiuta l'ultima busta di risparmio attiva, perché l'avanzo ne ha bisogno. Tutto in una transazione |
 | POST /api/cash/envelopes/{id}/unarchive | Annulla un'archiviazione fatta oggi: serve per l'"Annulla" del toast. Rifiuta se nel frattempo la busta di destinazione è stata archiviata, la sua allocazione è scesa sotto quella ricevuta o la busta dell'avanzo è cambiata |

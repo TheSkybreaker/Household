@@ -106,7 +106,6 @@
 .hint { font-size: 14px; color: var(--ink-2); margin: -8px 0 18px }
 
 /* offline */
-.offline { margin: 0 0 16px; padding: 12px 16px; border-radius: 16px; background: var(--accent-soft); color: var(--ink); font-size: 15px; font-weight: 700 }
 .fab:disabled, .chip:disabled, .add input:disabled, .add-btn:disabled, .item-toggle:disabled, .edit:disabled, .del:disabled, .field input:disabled, .btn:disabled { opacity: .5 }
 .sheet .btn + .btn { margin-top: 10px }
 

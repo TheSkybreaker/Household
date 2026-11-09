@@ -14,6 +14,8 @@ import (
 type cashSummary struct {
 	Month   string `json:"month"`
 	Current string `json:"current"`
+	// Today is the day in APP_TZ, which the apps take as today instead of the phone's date.
+	Today   string `json:"today"`
 	First   string `json:"first"`
 	Closed  bool   `json:"closed"`
 	SweepTo string `json:"sweepTo"`
@@ -400,7 +402,8 @@ func (c *cashBook) summaryOf(app core.App, month string) (cashSummary, error) {
 	if err := c.ensureCurrentMonth(); err != nil {
 		return cashSummary{}, err
 	}
-	current := c.currentMonth()
+	today := c.today()
+	current := today[:7]
 	if month == "" {
 		month = current
 	}
@@ -415,7 +418,9 @@ func (c *cashBook) summaryOf(app core.App, month string) (cashSummary, error) {
 	if err != nil {
 		return cashSummary{}, err
 	}
-	return l.summary(month, current, first), nil
+	summary := l.summary(month, current, first)
+	summary.Today = today
+	return summary, nil
 }
 
 func (c *cashBook) handleSummary(e *core.RequestEvent) error {

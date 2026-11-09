@@ -6,7 +6,8 @@ import type { CashSummary, EnvelopeSummary, Movement, MovementInput } from './ty
 const MAX_AMOUNT = 10_000_000;
 
 export interface MovementForm {
-  // Empty for a new movement.
+  // The edited movement's, or the one a new movement gets, made when the form opens: a save retried
+  // after a lost answer finds it taken instead of writing the movement twice.
   id: string;
   kind: 'spend' | 'extra';
   amount: string;
@@ -18,10 +19,10 @@ export interface MovementForm {
   shoppingList: string;
 }
 
-export function newForm(kind: MovementForm['kind'], envelopeId: string | null, month: string, today: string, meId: string, envelopes: EnvelopeSummary[]): MovementForm {
+export function newForm(id: string, kind: MovementForm['kind'], envelopeId: string | null, month: string, today: string, meId: string, envelopes: EnvelopeSummary[]): MovementForm {
   const firstSavings = envelopes.find((envelope) => envelope.kind === 'save')?.id ?? null;
   return {
-    id: '',
+    id,
     kind,
     amount: '',
     description: '',
@@ -48,6 +49,28 @@ export function editForm(movement: Movement): MovementForm {
     date: movement.date,
     shoppingList: movement.shopping_list,
   };
+}
+
+// The form switched to kind: an extra goes to a savings envelope, and a spend is mine, as in the demo.
+export function withKind(form: MovementForm, kind: MovementForm['kind'], envelopes: EnvelopeSummary[], meId: string): MovementForm {
+  const chosen = envelopes.find((envelope) => envelope.id === form.envelope);
+  if (kind === 'spend') return { ...form, kind, user: meId };
+  return { ...form, kind, envelope: chosen?.kind === 'save' ? form.envelope : (envelopes.find((envelope) => envelope.kind === 'save')?.id ?? form.envelope) };
+}
+
+// The day the server takes, as the demo does: an empty or wrong one becomes today, a future one
+// today, one before the first month that month's first day.
+export function clampDate(date: string, today: string, firstMonth: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) return today;
+  return date.slice(0, 7) < firstMonth ? `${firstMonth}-01` : date;
+}
+
+// What a refused save means for the form: the field to fix, or, when the id is already taken, an
+// earlier attempt of the same form that had gone through.
+export function refusal(data: Record<string, { code?: string }> | undefined): 'amount' | 'envelope' | 'saved' | null {
+  if (data?.id?.code === 'validation_not_unique') return 'saved';
+  if (data?.amount) return 'amount';
+  return data?.envelope ? 'envelope' : null;
 }
 
 export function validate(form: MovementForm, envelopes: EnvelopeSummary[]): 'amount' | 'envelope' | null {

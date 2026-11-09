@@ -152,7 +152,7 @@ func TestSummaryMonthBounds(t *testing.T) {
 		{Name: "after the current month", Method: http.MethodGet, URL: summary + "?month=2026-11", Headers: f.authA(), ExpectedStatus: 400, ExpectedContent: []string{`"data":{}`}},
 		{Name: "malformed month", Method: http.MethodGet, URL: summary + "?month=2026-9", Headers: f.authA(), ExpectedStatus: 400, ExpectedContent: []string{`"data":{}`}},
 		{Name: "guest", Method: http.MethodGet, URL: summary, ExpectedStatus: 401, ExpectedContent: []string{`"data":{}`}},
-		{Name: "the current month by default", Method: http.MethodGet, URL: summary, Headers: f.authA(), ExpectedStatus: 200, ExpectedContent: []string{`"month":"2026-10"`, `"left":-4000`}},
+		{Name: "the current month by default", Method: http.MethodGet, URL: summary, Headers: f.authA(), ExpectedStatus: 200, ExpectedContent: []string{`"month":"2026-10"`, `"left":-4000`, `"today":"2026-10-15"`}},
 	})
 }
 

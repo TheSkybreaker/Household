@@ -1,6 +1,7 @@
 ---
 import AppLinks from '@household/shared/components/AppLinks.astro';
 import Avatar from '@household/shared/components/Avatar.astro';
+import OfflineBanner from '@household/shared/components/OfflineBanner.astro';
 import Sheet from '@household/shared/components/Sheet.astro';
 import Toast from '@household/shared/components/Toast.astro';
 import Icon from '../components/Icon.astro';
@@ -17,6 +18,15 @@ import Page from '../components/Page.astro';
         </button>
       </div>
     </header>
+
+    <OfflineBanner />
+
+    <template x-if="!summary && loadFailed">
+      <div class="empty load-failed">
+        <p>Non riesco a leggere i conti.</p>
+        <button type="button" class="btn primary" @click="load()">Riprova</button>
+      </div>
+    </template>
 
     <template x-if="summary">
       <div>
@@ -87,7 +97,7 @@ import Page from '../components/Page.astro';
               <ul class="mvs">
                 <template x-for="row in day.rows" :key="row.id">
                   <li>
-                    <button type="button" class="mv" :class="{ 'is-fresh': fresh === row.id }" @click="open(row)">
+                    <button type="button" class="mv" :class="{ 'is-fresh': fresh === row.id }" :data-mv="row.id" @click="open(row)">
                       <span class="mv-ico" :class="{ in: rowIsIn(row) }">
                         <template x-if="row.kind === 'spend'"><i class="dot" :style="`background:${color(row.envelope)}`"></i></template>
                         <span x-show="row.kind === 'quota'" style="display:contents"><Icon name="income" /></span>
@@ -122,7 +132,7 @@ import Page from '../components/Page.astro';
 
     <Sheet open="sheet === 'add'" close="sheet = null" label="Nuovo movimento">
       <template x-if="form">
-        <form @submit.prevent="saveForm()" novalidate>
+        <form @submit.prevent="saveForm().then(() => formError === 'amount' && $refs.amount.focus())" novalidate>
           <h2 class="sh-title" tabindex="-1" autofocus x-text="editing ? (form.kind === 'spend' ? 'Modifica spesa' : 'Modifica versamento') : form.kind === 'spend' ? 'Nuova spesa' : 'Versamento extra'"></h2>
           <div class="seg" role="radiogroup" aria-label="Tipo di movimento" x-show="!editing">
             <button type="button" role="radio" :aria-checked="form.kind === 'spend'" @click="setKind('spend')">Spesa</button>
@@ -139,7 +149,7 @@ import Page from '../components/Page.astro';
               <div class="flabel" id="lWho">Di chi sono</div>
               <div class="who" role="radiogroup" aria-labelledby="lWho">
                 <button type="button" role="radio" :aria-checked="form.user === meId" @click="form.user = meId"><span class="av xs" :class="avatarClass(meId)" aria-hidden="true" x-text="initialOf(meId)"></span><span>Miei</span></button>
-                <button type="button" role="radio" :aria-checked="form.user === partnerId()" @click="form.user = partnerId()"><span class="av xs" :class="avatarClass(partnerId())" aria-hidden="true" x-text="initialOf(partnerId())"></span><span x-text="`Di ${nameOf(partnerId())}`"></span></button>
+                <button type="button" role="radio" :aria-checked="form.user === partnerId()" :disabled="!partnerId()" @click="form.user = partnerId()"><span class="av xs" :class="avatarClass(partnerId())" aria-hidden="true" x-text="initialOf(partnerId())"></span><span x-text="`Di ${nameOf(partnerId())}`"></span></button>
               </div>
             </div>
           </template>
@@ -151,8 +161,8 @@ import Page from '../components/Page.astro';
           </div>
           <p class="hint" x-show="!formEnvelopes.length">Ancora nessuna busta: le create dalla Divisione.</p>
           <p class="err" role="alert" x-show="formError === 'envelope'" x-text="form.kind === 'spend' ? 'Scegli da quale busta.' : 'Scegli in quale busta.'"></p>
-          <p class="preview" x-show="formEnvelopes.length" x-html="previewText"></p>
-          <label class="field">Data<input type="date" x-model="form.date" :min="`${summary?.first}-01`" :max="todayIso" @change="dateChanged()" /></label>
+          <p class="preview" x-show="formSummary && formEnvelopes.length" x-html="previewText"></p>
+          <label class="field">Data<input type="date" x-model="form.date" :min="`${summary?.first}-01`" :max="today" @change="dateChanged()" /></label>
           <button type="submit" class="btn primary wide save" :disabled="saving || !online || !formEnvelopes.length" x-text="editing ? 'Salva' : form.kind === 'spend' ? 'Aggiungi spesa' : 'Aggiungi versamento'"></button>
         </form>
       </template>
@@ -209,7 +219,7 @@ import Page from '../components/Page.astro';
           <div class="detail-amt num" x-text="signed(openRow.amount)"></div>
           <p class="sh-sub" x-text="`${openRow.amount > 0 ? 'Quello che è avanzato nelle buste di spesa' : 'Quanto le buste di spesa sono andate oltre'} a ${monthName(summary.month)}, ${openRow.amount > 0 ? 'spostato nel' : 'preso dal'} ${sweepToName} il ${dayShort(openRow.date)}.`"></p>
           <ul class="mini-l">
-            <template x-for="line in sweepLines" :key="line.envelope?.id">
+            <template x-for="(line, index) in sweepLines" :key="line.envelope?.id ?? index">
               <li><span><i class="dot" :style="`background:${color(line.envelope)};margin-right:8px`"></i><span x-text="line.envelope?.name ?? 'busta'"></span></span><span x-text="signed(line.amount)"></span></li>
             </template>
           </ul>

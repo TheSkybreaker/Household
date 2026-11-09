@@ -1,13 +1,13 @@
-import { capitalize, toIsoDate } from '@household/shared/dates';
+import { addDays, capitalize, fromIsoDate, toIsoDate } from '@household/shared/dates';
 import { formatEuro, formatEuroRound } from '@household/shared/money';
-import type { User } from '@household/shared/pb';
+import { newRecordId, type User } from '@household/shared/pb';
 import { toast } from '@household/shared/toast';
 import { undoable } from '@household/shared/undo';
 import { createMovement, deleteMovement, loadMonth, loadRecentShopping, loadUsers, payQuota, unpayQuota, updateMovement } from './api';
 import { restoreMonthCache, restoreUsers, saveMonthCache, saveUsers } from './cache';
 import { homePage } from './home-page';
 import { dayKind, monthNav, movementRows, paidOnFor, panelState, sweepBreakdown, type EnvelopeRef, type MovementRow } from './month';
-import { editForm, newForm, preview, shoppingShortcut, toRecord, validate, type MovementForm } from './movement-form';
+import { clampDate, editForm, newForm, preview, refusal, shoppingShortcut, toRecord, validate, withKind, type MovementForm } from './movement-form';
 import { pieArcs } from './pie';
 import { session } from './stores';
 import type { CashSummary, EnvelopeSummary, Movement, MonthData, PieSlice } from './types';
@@ -19,7 +19,8 @@ const parseDay = (date: string) => {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(year, month - 1, day || 1);
 };
-const today = () => toIsoDate(new Date());
+const deviceToday = () => toIsoDate(new Date());
+const statusOf = (error: unknown) => (error as { status?: number }).status;
 
 // "ottobre"
 export const monthName = (month: string) => monthFormat.format(parseDay(month));
@@ -45,26 +46,49 @@ export function monthPage() {
     armed: false,
     fresh: '',
     saving: false,
+    // The first load found neither the server nor a saved month.
+    loadFailed: false,
+    // Today in APP_TZ from the last answer of the server, and the phone's day then.
+    serverToday: '',
+    loadedOn: '',
+    // Counters that let only the latest load of the month, or of the form's month, land.
+    loads: 0,
+    formLoads: 0,
+    forms: 0,
 
     async init() {
-      this.data = restoreMonthCache();
+      // The saved copy of this month paints at once, else the last month shown; the server then
+      // answers with the current month.
+      this.data = restoreMonthCache(deviceToday().slice(0, 7)) ?? restoreMonthCache();
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') void this.reload();
+        if (document.visibilityState !== 'visible') return;
+        // Back on another day, the current month again; on the same day, the month on screen.
+        void this.load(deviceToday() === this.loadedOn ? this.data?.summary.month : undefined);
       });
-      await Promise.all([this.reload(), this.refreshUsers()]);
+      await Promise.all([this.load(), this.refreshUsers()]);
     },
 
-    // The month on screen when month is absent.
-    async reload(month?: string) {
-      const wanted = month ?? this.data?.summary.month;
+    // Shows month, the current one when absent, unless a newer load started meanwhile.
+    async load(month?: string) {
+      const ticket = ++this.loads;
       try {
-        const data = await loadMonth(wanted);
+        const data = await loadMonth(month);
+        if (ticket !== this.loads) return;
         this.data = data;
+        this.serverToday = data.summary.today;
+        this.loadedOn = deviceToday();
+        this.loadFailed = false;
         saveMonthCache(data);
       } catch {
-        // Offline or a server error: the saved copy of the month, if there is one, else what is shown.
-        this.data = restoreMonthCache(wanted) ?? this.data;
+        if (ticket !== this.loads) return;
+        // Offline or a server error: what is shown stays when it is that month, else the saved copy.
+        if (month && this.data?.summary.month !== month) this.data = restoreMonthCache(month) ?? this.data;
+        this.loadFailed = !this.data;
       }
+    },
+    // The month on screen, again.
+    reload() {
+      return this.load(this.data?.summary.month);
     },
 
     async refreshUsers() {
@@ -99,8 +123,9 @@ export function monthPage() {
       const slices: PieSlice[] = this.summary ? this.summary.pie[this.pieRange] : [];
       return pieArcs(slices, this.pieSelected);
     },
-    get todayIso(): string {
-      return today();
+    // The server's day while online, so a phone ahead of APP_TZ cannot date a movement in the future.
+    get today(): string {
+      return this.serverToday || deviceToday();
     },
     // Alpine cannot repeat elements inside an <svg>, so the ring is markup; a tap on a slice
     // reaches pieTap through data-envelope.
@@ -122,14 +147,14 @@ export function monthPage() {
     get envelopes(): EnvelopeSummary[] {
       return this.summary?.envelopes ?? [];
     },
-    // The envelopes of the month of the form's date.
+    // The envelopes of the month of the form's date, those on screen while it cannot be read.
     get formEnvelopes(): EnvelopeSummary[] {
-      return this.formSummary?.envelopes ?? [];
+      return (this.formSummary ?? this.summary)?.envelopes ?? [];
     },
 
     go(month: string) {
       this.pieSelected = null;
-      void this.reload(month);
+      void this.load(month);
     },
 
     // Text helpers for the markup.
@@ -147,11 +172,11 @@ export function monthPage() {
     yearOf: (month: string) => month.slice(0, 4),
     dayShort,
     dayLabel(date: string) {
-      const kind = dayKind(date, today());
+      const kind = dayKind(date, this.today);
       return kind === 'today' ? 'Oggi' : kind === 'yesterday' ? 'Ieri' : capitalize(dayFormat.format(parseDay(date)));
     },
     nameOf(userId: string) {
-      return this.users[userId]?.name ?? session().me?.name ?? '';
+      return this.users[userId]?.name ?? (userId === this.meId ? session().me?.name : '') ?? '';
     },
     personLabel(userId: string) {
       return userId === this.meId ? 'Tu' : this.nameOf(userId);
@@ -210,7 +235,7 @@ export function monthPage() {
       const mine = this.panel?.people.find((person) => person.userId === this.meId);
       if (!mine || !this.summary || !this.online) return;
       try {
-        await payQuota(mine.quotaId, paidOnFor(this.summary.month, today()));
+        await payQuota(mine.quotaId, paidOnFor(this.summary.month, this.today));
         this.fresh = `quota-${mine.quotaId}`;
         await this.reload();
         toast().show('Quota segnata');
@@ -223,7 +248,8 @@ export function monthPage() {
     async openAdd(kind: 'spend' | 'extra' = 'spend', envelopeId: string | null = null) {
       if (!this.summary) return;
       this.editing = null;
-      this.form = newForm(kind, envelopeId, this.summary.month, today(), this.meId, this.envelopes);
+      this.forms++;
+      this.form = newForm(newRecordId(), kind, envelopeId, this.summary.month, this.today, this.meId, this.envelopes);
       this.formSummary = this.summary;
       this.formError = null;
       this.shortcut = null;
@@ -234,6 +260,7 @@ export function monthPage() {
       const movement = this.openRow?.movement;
       if (!movement) return;
       this.editing = movement;
+      this.forms++;
       this.form = editForm(movement);
       this.formSummary = this.summary;
       this.formError = null;
@@ -241,50 +268,51 @@ export function monthPage() {
       this.sheet = 'add';
     },
     async findShortcut() {
+      const form = this.forms;
       try {
-        const yesterday = toIsoDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
-        const recent = await loadRecentShopping(yesterday);
-        this.shortcut = shoppingShortcut(recent.lists, recent.items, recent.movements, today());
+        const recent = await loadRecentShopping(toIsoDate(addDays(fromIsoDate(this.today), -1)));
+        // Ignored when the sheet was closed or holds another form by now.
+        if (form === this.forms) this.shortcut = shoppingShortcut(recent.lists, recent.items, recent.movements, this.today);
       } catch {
         this.shortcut = null;
       }
     },
     // "Spesa veloce, oggi"
     get shortcutTitle(): string {
-      return this.shortcut ? `${this.shortcut.title}, ${dayKind(this.shortcut.date, today()) === 'today' ? 'oggi' : 'ieri'}` : '';
+      return this.shortcut ? `${this.shortcut.title}, ${dayKind(this.shortcut.date, this.today) === 'today' ? 'oggi' : 'ieri'}` : '';
     },
-    useShortcut() {
+    async useShortcut() {
       if (!this.form || !this.shortcut) return;
       this.form.description = this.shortcut.title;
       this.form.shoppingList = this.shortcut.listId;
-      this.form.envelope = this.envelopes.find((envelope) => envelope.name === 'Spesa')?.id ?? this.form.envelope;
       // The day of the shopping, which may be yesterday and even last month.
       this.form.date = this.shortcut.date;
       this.shortcut = null;
-      void this.dateChanged();
+      await this.dateChanged();
+      if (this.form) this.form.envelope = this.formEnvelopes.find((envelope) => envelope.name === 'Spesa')?.id ?? this.form.envelope;
     },
     setKind(kind: 'spend' | 'extra') {
       if (!this.form || this.form.kind === kind) return;
-      this.form.kind = kind;
+      this.form = withKind(this.form, kind, this.formEnvelopes, this.meId);
       this.formError = null;
-      if (kind === 'extra' && this.envelopes.find((envelope) => envelope.id === this.form?.envelope)?.kind !== 'save') {
-        this.form.envelope = this.envelopes.find((envelope) => envelope.kind === 'save')?.id ?? this.form.envelope;
-      }
     },
     // The preview reads the summary of the form's month, which may not be the one on screen.
     async dateChanged() {
       const month = this.form?.date.slice(0, 7);
       if (!month || month === this.formSummary?.month) return;
+      const ticket = ++this.formLoads;
       try {
-        this.formSummary = month === this.summary?.month ? this.summary : (await loadMonth(month)).summary;
+        const summary = month === this.summary?.month ? this.summary : (await loadMonth(month)).summary;
+        if (ticket === this.formLoads) this.formSummary = summary;
       } catch {
-        this.formSummary = null;
+        // Unknown for now: the chips are those on screen and the server checks the save.
+        if (ticket === this.formLoads) this.formSummary = null;
       }
     },
     get previewText(): string {
       if (!this.form) return '';
       const result = preview(this.form, this.formSummary, this.editing ?? undefined);
-      const name = escape(this.envelopes.find((envelope) => envelope.id === this.form?.envelope)?.name ?? '');
+      const name = escape(this.formEnvelopes.find((envelope) => envelope.id === this.form?.envelope)?.name ?? '');
       switch (result.kind) {
         case 'needEnvelope':
           return this.form.kind === 'spend' ? 'Scegli da quale busta prendere i soldi.' : 'Scegli in quale busta metterli.';
@@ -299,19 +327,40 @@ export function monthPage() {
       }
     },
     async saveForm() {
-      if (!this.form || this.saving || !this.online) return;
-      this.formError = validate(this.form, this.formEnvelopes);
-      if (this.formError) return;
+      if (!this.form || this.saving || !this.online || !this.summary) return;
       this.saving = true;
-      const record = toRecord(this.form);
       try {
-        const saved = this.editing ? await updateMovement(this.editing.id, record) : await createMovement(record, this.meId);
+        this.form.date = clampDate(this.form.date, this.today, this.summary.first);
+        await this.dateChanged();
+        this.formError = validate(this.form, this.formEnvelopes);
+        if (this.formError) return;
+        const id = this.form.id;
+        const record = toRecord(this.form);
+        try {
+          if (this.editing) await updateMovement(id, record);
+          else await createMovement(record, this.meId, id);
+        } catch (error) {
+          const refused = refusal((error as { response?: { data?: Record<string, { code?: string }> } }).response?.data);
+          if (refused !== 'saved') {
+            if (refused) this.formError = refused;
+            else toast().show('Non salvato, riprova');
+            // An envelope gone meanwhile leaves the chips once the form's month is read again.
+            if (refused === 'envelope') {
+              await this.reload();
+              this.formSummary = null;
+              await this.dateChanged();
+            }
+            return;
+          }
+        }
         this.sheet = null;
-        this.fresh = saved.id;
-        await this.reload(record.date.slice(0, 7));
+        this.fresh = id;
+        await this.load(record.date.slice(0, 7));
         toast().show(this.editing ? 'Movimento salvato' : record.kind === 'spend' ? 'Spesa aggiunta' : 'Versamento aggiunto');
-      } catch {
-        toast().show('Non salvato, riprova');
+        // The new row, drawn by the next frame, comes into view as in the demo.
+        requestAnimationFrame(() =>
+          document.querySelector(`[data-mv="${id}"]`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }),
+        );
       } finally {
         this.saving = false;
       }
@@ -343,8 +392,11 @@ export function monthPage() {
       if (row.kind === 'quota') {
         void undoable('Quota segnata come non versata', {
           run: async () => {
-            await unpayQuota(row.quotaId);
-            await this.reload();
+            try {
+              await unpayQuota(row.quotaId);
+            } finally {
+              await this.reload();
+            }
           },
           undo: async () => {
             await payQuota(row.quotaId, row.date);
@@ -359,11 +411,17 @@ export function monthPage() {
       const record = toRecord(editForm(movement));
       void undoable(`${this.rowTitle(row)} eliminato`, {
         run: async () => {
-          await deleteMovement(movement.id);
-          await this.reload();
+          try {
+            await deleteMovement(movement.id);
+          } catch (error) {
+            // Already deleted on the other phone: what was asked is done.
+            if (statusOf(error) !== 404) throw error;
+          } finally {
+            await this.reload();
+          }
         },
         undo: async () => {
-          await createMovement(record, this.meId);
+          await createMovement(record, this.meId, newRecordId());
           await this.reload();
         },
       });

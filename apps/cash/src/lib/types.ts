@@ -41,6 +41,8 @@ export interface SavingsSeries {
 export interface CashSummary {
   month: string;
   current: string;
+  // Today in APP_TZ.
+  today: string;
   first: string;
   closed: boolean;
   sweepTo: string;

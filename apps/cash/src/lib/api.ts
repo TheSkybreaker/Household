@@ -1,4 +1,4 @@
-import { newRecordId, pb, type User } from '@household/shared/pb';
+import { pb, type User } from '@household/shared/pb';
 import type { CashSummary, Movement, MovementInput, MonthData } from './types';
 
 // The summary of month, the current one when absent, and its movements, newest first.
@@ -45,8 +45,8 @@ export function unpayQuota(quotaId: string) {
   return pb.collection('month_quotas').update(quotaId, { paid_on: '' });
 }
 
-export function createMovement(input: MovementInput, meId: string) {
-  return pb.collection('movements').create<Movement>({ id: newRecordId(), ...input, created_by: meId });
+export function createMovement(input: MovementInput, meId: string, id: string) {
+  return pb.collection('movements').create<Movement>({ id, ...input, created_by: meId });
 }
 
 export function updateMovement(id: string, input: MovementInput) {
