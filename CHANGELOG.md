@@ -1,5 +1,10 @@
 # Changelog
 
+## Conti milestone 3: scheda Mese
+
+- The Mese tab on real data: months from the first one to the current one, the mint panel with what is left and the quotas with "Segna come versato", the pie per envelope for the month or since the first month, and the movements by day with the avanzo of closed months. The last month shown stays on the phone and opens offline, with writes disabled.
+- Aggiungi for spends and extras with the effect on the envelope, the shortcut for a Spesa list of today or yesterday with everything taken, editing a movement, and deleting it or unpaying the own quota at once with Annulla in the toast. Quotas still at 0 ask to be set in the Divisione.
+
 ## Punti aperti delle milestone 1 e 2
 
 - The session cookie lives on /household/api/, which Caddy hands to PocketBase as /api/, so the other sites on skybreaker.dev no longer receive it; the old cookie on /api/ is moved with one refresh. COOKIE_DOMAIN is required outside development. A failed Esci keeps the Spesa notifications and says so in Conti; an app finding its session closed drops what it kept.

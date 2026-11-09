@@ -465,9 +465,9 @@ Sei milestone in sequenza; la prima tocca anche la Spesa e porta già in produzi
 
 ### 3. Scheda Mese
 
-- [ ] Riquadro dei rimasti, quote e "Segna come versato"
-- [ ] Torta per busta con i due periodi e la selezione
-- [ ] Movimenti per giorno, pannelli Aggiungi e Movimento, scorciatoia dalla Spesa
+- [x] Riquadro dei rimasti, quote e "Segna come versato"
+- [x] Torta per busta con i due periodi e la selezione
+- [x] Movimenti per giorno, pannelli Aggiungi e Movimento, scorciatoia dalla Spesa
 - [ ] Confronto con `docs/demo-cash.html` su un telefono, in chiaro e in scuro
 
 ### 4. Schede Buste e Divisione
