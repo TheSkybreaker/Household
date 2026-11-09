@@ -538,7 +538,7 @@ function loginView() {
   return `<main class="login">
     <div class="login-mark">${I.coins}</div>
     <h1>Conti</h1>
-    <p class="login-sub">La cassa comune di casa, divisa in buste. Se sei già entrato nella Spesa, qui sei già dentro.</p>
+    <p class="login-sub">La cassa comune di casa, divisa in buste</p>
     <form id="loginForm">
       <label class="field">Email<input id="lgEmail" type="email" value="${esc(emailOf('v'))}" autocomplete="username"></label>
       <label class="field">Password<input id="lgPass" type="password" value="demodemo" autocomplete="current-password"></label>
@@ -1094,7 +1094,7 @@ function profileSheet() {
     <label class="field" style="margin-top:0">Il tuo nome<input id="nameMe" value="${esc(nameOf(me))}" maxlength="20"></label>
     <label class="field" style="margin-top:0">L'altra persona<input id="nameOther" value="${esc(nameOf(o))}" maxlength="20"></label>
   </div>
-  <p class="hint">Lo stesso accesso vale per tutte e due le app; uscendo da una esci anche dall'altra. Qui le notifiche sono simulate e i dati restano in questo browser.</p>
+  <p class="hint">Qui le notifiche sono simulate e i dati restano in questo browser.</p>
   <button type="button" class="btn ghost wide" data-act="logout">Esci</button>`;
 }
 function demoSheet() {
