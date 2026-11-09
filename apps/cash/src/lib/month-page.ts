@@ -25,6 +25,8 @@ const today = () => toIsoDate(new Date());
 export const monthName = (month: string) => monthFormat.format(parseDay(month));
 // "1 ott"
 const dayShort = (date: string) => dayShortFormat.format(parseDay(date)).replace('.', '');
+// Envelope names are typed by people and go into x-html.
+const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
 export function monthPage() {
   return {
@@ -104,7 +106,6 @@ export function monthPage() {
     // reaches pieTap through data-envelope.
     get pieSvg(): string {
       const pie = this.pie;
-      const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
       const paths = pie.arcs
         .map((arc) => `<path d="${arc.path}" fill="var(--e${arc.slot})" stroke="var(--paper)" stroke-width="2" stroke-linejoin="round" opacity="${arc.dimmed ? 0.28 : 1}" data-envelope="${arc.envelope}"><title>${escape(arc.name)}: ${formatEuro(arc.amount)}</title></path>`)
         .join('');
@@ -283,7 +284,7 @@ export function monthPage() {
     get previewText(): string {
       if (!this.form) return '';
       const result = preview(this.form, this.formSummary, this.editing ?? undefined);
-      const name = this.envelopes.find((envelope) => envelope.id === this.form?.envelope)?.name ?? '';
+      const name = escape(this.envelopes.find((envelope) => envelope.id === this.form?.envelope)?.name ?? '');
       switch (result.kind) {
         case 'needEnvelope':
           return this.form.kind === 'spend' ? 'Scegli da quale busta prendere i soldi.' : 'Scegli in quale busta metterli.';
