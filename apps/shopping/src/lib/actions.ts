@@ -1,8 +1,9 @@
+import { saveMyName } from '@household/shared/session';
 import { capitalize } from './dates';
 import { scheduleDeletion } from './deletions';
 import { findByName, removedLabel, splitItems } from './groups';
 import { editChanges, parseEntry } from './parse';
-import { newRecordId, pb, type Item, type List, type User } from './pb';
+import { newRecordId, pb, type Item, type List } from './pb';
 import { items, session, toast } from './stores';
 
 // Writes are optimistic: the stores change first, then the request runs, and a failure puts
@@ -170,13 +171,9 @@ export async function createList(date: string, title: string, carried: Item[] = 
 }
 
 export async function renameMe(name: string) {
-  const me = session().me;
-  const trimmed = name.trim();
-  if (!me || !trimmed || trimmed === me.name) return;
-
   try {
-    const updated = await pb.collection('users').update<User>(me.id, { name: trimmed });
-    session().users[me.id] = updated;
+    const updated = await saveMyName(session().me, name);
+    if (updated) session().users[updated.id] = updated;
   } catch {
     toast().show('Non salvato, riprova');
   }

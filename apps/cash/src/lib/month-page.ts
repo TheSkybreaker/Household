@@ -177,7 +177,8 @@ export function monthPage() {
       return kind === 'today' ? 'Oggi' : kind === 'yesterday' ? 'Ieri' : capitalize(dayFormat.format(parseDay(date)));
     },
     nameOf(userId: string) {
-      return this.users[userId]?.name ?? (userId === this.meId ? session().me?.name : '') ?? '';
+      // My name from the session, which a rename in the profile updates at once.
+      return (userId === this.meId ? session().me?.name : this.users[userId]?.name) ?? '';
     },
     personLabel(userId: string) {
       return userId === this.meId ? 'Tu' : this.nameOf(userId);

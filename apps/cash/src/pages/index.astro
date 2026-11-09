@@ -13,7 +13,7 @@ import Page from '../components/Page.astro';
     <header class="top">
       <div class="brand"><span class="brand-mark"><Icon name="coins" /></span><span>Conti</span></div>
       <div class="top-actions">
-        <button type="button" class="av-btn" aria-label="Profilo" @click="sheet = 'profile'">
+        <button type="button" class="av-btn" aria-label="Profilo" @click="openProfile()">
           <Avatar user="$store.session.me?.id" size="md" />
         </button>
       </div>
@@ -237,6 +237,7 @@ import Page from '../components/Page.astro';
         </div>
       </div>
       <AppLinks current="cash" />
+      <label class="field">Il tuo nome<input x-model="nameDraft" maxlength="20" required :disabled="!$store.session.online" @change="saveName()" /></label>
       <button type="button" class="btn ghost wide" :disabled="!$store.session.online" @click="logout()">Esci</button>
       <p class="hint" role="alert" x-show="logoutFailed">Non salvato, riprova</p>
     </Sheet>

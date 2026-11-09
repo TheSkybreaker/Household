@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cachedUser, refreshSession, signIn, signOut } from './session';
+import { cachedUser, refreshSession, saveMyName, signIn, signOut } from './session';
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -105,5 +105,25 @@ describe('signIn and signOut', () => {
     expect(await signOut()).toBe(true);
     expect(cachedUser()).toBeNull();
     expect(localStorage.getItem('pocketbase_auth')).toBeNull();
+  });
+});
+
+describe('saveMyName', () => {
+  it('saves the new name, trimmed, and keeps it for offline', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { ...record, name: 'Vitto' }));
+    expect((await saveMyName(publicUser, '  Vitto ')).name).toBe('Vitto');
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual({ name: 'Vitto' });
+    expect(cachedUser()?.name).toBe('Vitto');
+  });
+
+  it('sends nothing for an empty or unchanged name', async () => {
+    expect(await saveMyName(publicUser, '   ')).toBeNull();
+    expect(await saveMyName(publicUser, 'Vittorio')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails when the server refuses', async () => {
+    fetchMock.mockResolvedValueOnce(json(400, { status: 400, message: 'no', data: {} }));
+    await expect(saveMyName(publicUser, 'Vitto')).rejects.toThrow();
   });
 });

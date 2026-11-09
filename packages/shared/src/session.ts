@@ -90,3 +90,13 @@ export async function signOut(): Promise<boolean> {
   pb.authStore.clear();
   return true;
 }
+
+// Saves my new name and keeps it for offline; null when there is nothing to save. The SDK also
+// updates the signed-in record, so both apps see the new name at once.
+export async function saveMyName(me: User | null, name: string): Promise<User | null> {
+  const trimmed = name.trim();
+  if (!me || !trimmed || trimmed === me.name) return null;
+  const updated = await pb.collection('users').update<User>(me.id, { name: trimmed });
+  rememberUser(updated);
+  return updated;
+}
